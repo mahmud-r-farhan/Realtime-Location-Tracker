@@ -3,32 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="keywords" content="Real time location tracker, real-time, location-tracker, Leaflet, JavaScript, monitoring, surveillance, node.js, Express.js, socket.io, ejs">
-    <meta name="author" content="Mahmud R. Farhan">
-    <meta name="description" content="The Real-Time Location Tracker is a web application that allows users to track the real-time location of devices. This project leverages Leaflet for map visualization and WebSockets for real-time communication,
-                                        making it ideal for applications like fleet management, delivery tracking, and personal location sharing.Features Real-Time Tracking: Track the location of devices in real-time.
-                                        Device Identification: Identify devices based on their user agent string (e.g., Android, iOS, Windows, Mac).Custom Icons: Display custom icons for different types of devices. Offline Map Support:
-                                        Automatically switch between online and offline maps based on internet connectivity. Responsive Design: Fully responsive design for seamless use on both desktop and mobile devices.">
-    <meta name="robots" content="index, follow">
-
-    <!--Title-->
-    <title>Real-Time Tracking App</title>
-
-    <!--custom css-->
-    <link rel="stylesheet" href="/css/style.css" type="text/css">
-
-    <!--leaflet map css-->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="icon" type="image/png" href="assets/favico.png">
+    <title>Real-Time Location Tracker</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <div id="map"></div>
+    <div id="sidebar" class="collapsed">
+        <div id="sidebar-toggle">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div id="info-panel">
+            <h2>Connected Devices</h2>
+            <ul id="device-list"></ul>
+        </div>
+    </div>
+    <div id="name-popup" class="hidden">
+        <div class="popup-content">
+            <h2>Welcome to Real-Time Location Tracker 
+                <img src="/assets/icons8-location.gif" 
+                style="width: 26px; height: auto;"
+                alt="icon-gif">
+            </h2>
+            <p>Assigned name:</p>
+            <input type="text" id="user-name-input" placeholder="Your Name">
+            <div class="popup-buttons">
+                <button id="continue-btn">Continue</button>
+                <button id="cancel-btn">Set default</button>
+            </div>
+        </div>
+    </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet-src.min.js"
-    integrity="sha512-3/WyQrhTdqSVmSifQS62akgtNBhZha2lS44TnoN9Jk3J01FvsKK4suVmz6t5FtccGb5iJw58GoFhBjPE5EPc8Q=="
-    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO" crossorigin="anonymous"></script>
-    
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/js/script.js"></script>
 </body>
 </html>

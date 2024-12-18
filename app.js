@@ -1,31 +1,54 @@
-const express = require("express");
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const path = require('path');
+const compression = require('compression');
+
 const app = express();
-const path = require("path");
-
-const http=require("http");
-
-const socketio = require("socket.io");
 const server = http.createServer(app);
-const io = socketio(server);
+const io = socketIo(server);
 
+app.set('view engine', 'ejs');
+app.use(compression());
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
-app.set(express.static(path.join(__dirname, "public")));
-app.use(express.static("public"));
-io.on("connection", function (socket){
-    socket.on("send-location", function (data){
-        const { latitude, longitude, deviceName } = data;
-        io.emit('receive-location', { id: socket.id, latitude, longitude, deviceName });
+app.get('/', (req, res) => {
+    res.render('index');
+});
 
+app.get('/developer', (req, res) => {
+    res.send('https://gravatar.com/floawd');
+});
+
+const connectedDevices = new Map();
+
+io.on('connection', (socket) => {
+    console.log('New Device Connected');
+
+    socket.on('send-location', (data) => {
+        const { latitude, longitude, deviceName, accuracy } = data;
+        console.log(deviceName)
+        connectedDevices.set(socket.id, { latitude, longitude, deviceName, accuracy });
+        io.emit('receive-location', { id: socket.id, ...data });
+        io.emit('update-device-list', Array.from(connectedDevices.entries()));
     });
 
-    socket.on("disconnect", function(){
-        io.emit("user-disconncet", socket.id);
+    socket.on('request-device-location', (deviceId) => {
+        const deviceData = connectedDevices.get(deviceId);
+        if (deviceData) {
+            socket.emit('focus-device-location', { id: deviceId, ...deviceData });
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Device disconnected');
+        connectedDevices.delete(socket.id);
+        io.emit('user-disconnect', socket.id);
+        io.emit('update-device-list', Array.from(connectedDevices.entries()));
     });
 });
 
-app.get("/", function(req, res){
-    res.render("index.ejs");
+const PORT = 3000;
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
-
-server.listen(3000);
-
