@@ -1,6 +1,6 @@
 {
   "name": "realtime_tracker",
-  "version": "2.3.8",
+  "version": "2.3.9",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
