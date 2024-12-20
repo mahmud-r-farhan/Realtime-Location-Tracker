@@ -13,7 +13,7 @@ With its ability to switch seamlessly between online and offline map modes, the 
 
 -   **Real-Time Tracking:** Seamlessly track device locations as they move, with continuous real-time updates displayed on the map.
 -   **Smart Device Identification:** Automatically recognize and categorize devices based on their user agent strings, distinguishing Android, iOS, Windows, Mac, and more.
--   **Device Connection Panel:** View a dynamic list of all connected devices, and click on any device to instantly see its real-time location on the map.
+-   **Device Connection Panel:** View a dynamic list of all connected devices with active number of device, and click on any device to instantly see its real-time location on the map.
 -   **Customizable Icons:** Display unique, visually distinct icons for different device types, enhancing identification and user experience.
 -   **Offline Map Support:** Ensure uninterrupted functionality by intelligently switching between online and offline map modes based on internet connectivity.
 -   **Fully Responsive Design:** Enjoy a seamless and intuitive experience across all devices, with layouts optimized for desktops, tablets, and mobile screens.

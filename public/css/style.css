@@ -53,9 +53,20 @@ html, body {
     height: 100%;
     overflow-y: auto;
 }
+.Connected-Devices {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
 
 #info-panel h2 {
-    margin-bottom: 20px;
+    font-size: 1.2em;
+    color: #333;
+}
+
+#info-panel h2 {
+    padding-left: 2px;
     font-size: 1.2em;
     color: #333;
 }

@@ -24,6 +24,7 @@ const connectedDevices = new Map();
 
 io.on('connection', (socket) => {
     console.log('New Device Connected');
+    io.emit('update-user-count', connectedDevices.size);
 
     socket.on('send-location', (data) => {
         const { latitude, longitude, deviceName, accuracy } = data;
@@ -31,6 +32,7 @@ io.on('connection', (socket) => {
         connectedDevices.set(socket.id, { latitude, longitude, deviceName, accuracy });
         io.emit('receive-location', { id: socket.id, ...data });
         io.emit('update-device-list', Array.from(connectedDevices.entries()));
+        io.emit('update-user-count', connectedDevices.size);
     });
 
     socket.on('request-device-location', (deviceId) => {
@@ -45,6 +47,7 @@ io.on('connection', (socket) => {
         connectedDevices.delete(socket.id);
         io.emit('user-disconnect', socket.id);
         io.emit('update-device-list', Array.from(connectedDevices.entries()));
+        io.emit('update-user-count', connectedDevices.size);
     });
 });
 

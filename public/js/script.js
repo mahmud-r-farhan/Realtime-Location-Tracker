@@ -176,3 +176,8 @@ if ('serviceWorker' in navigator) {
             console.error('Service Worker registration failed:', error);
         });
 }
+
+socket.on('update-user-count', (count) => {
+    const userCountElement = document.getElementById('user-count');
+    userCountElement.textContent = ` ${count}`;
+});
