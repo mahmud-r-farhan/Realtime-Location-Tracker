@@ -1,6 +1,6 @@
 {
-  "name": "monitoring-with-talks",
-  "version": "2.4.3",
+  "name": "realtime_tracker",
+  "version": "2.4.2",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
