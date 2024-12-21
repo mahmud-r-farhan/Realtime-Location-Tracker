@@ -1,4 +1,4 @@
-# Real-Time Location Tracker & Monitoing with Audio communication
+# Real-Time Location Tracking and Monitoring with Audio Communication
 
 ### Overview
 
