@@ -17,10 +17,18 @@
         </div>
         <div id="info-panel">
             <div class="Connected-Devices">
-            <h2>Connected Devices</h2>
-            <h3 id="user-count"> 0</h3>
+                <h2>Connected Devices</h2>
+                <h3 id="user-count">0</h3>
             </div>
             <ul id="device-list"></ul>
+            <div id="audio-controls">
+                <button id="mic-btn">
+                    <img src="/assets/microphone-muted-icon.png" alt="Microphone">
+                </button>
+                <button id="speaker-btn">
+                    <img src="/assets/speaker-on-icon.png" alt="Speaker">
+                </button>
+            </div>
         </div>
     </div>
     <div id="name-popup" class="hidden">
@@ -31,10 +39,9 @@
                 alt="icon-gif">
             </h2>
             <p>Assigned name:</p>
-            <input type="text" id="user-name-input" placeholder="Your Name">
+            <input type="text" id="user-name-input" placeholder="Your Name (optional)">
             <div class="popup-buttons">
                 <button id="continue-btn">Continue</button>
-                <button id="cancel-btn">Set default</button>
             </div>
         </div>
     </div>

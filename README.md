@@ -1,13 +1,12 @@
-# Real-Time Location Tracker
+# Real-Time Location Tracker & Monitoing with Audio communication
 
 ### Overview
 
-The **Real-Time Location Tracker** is an advanced web application designed to monitor and track the real-time locations of connected devices. Powered by **Leaflet** for interactive map visualization and **WebSockets** for instant, real-time communication, this application is ideal for diverse use cases such as fleet management, delivery tracking, team coordination, and personal location sharing.
+The **Real-Time Location Tracker** is an advanced web application designed to monitor and track the real-time locations of connected devices. Powered by **Leaflet** for interactive map visualization, **WebSockets** for instant, real-time communication, and **WebRTC** for audio communication, this application is ideal for diverse use cases such as fleet management, delivery tracking, team coordination, and personal location sharing.
 
 With its ability to switch seamlessly between online and offline map modes, the application ensures uninterrupted functionality even in areas with limited or no internet connectivity. Its fully responsive design guarantees an intuitive and consistent user experience across a wide range of devices, including desktops, tablets, and smartphones.
 
 ---
-
 
 ### Features
 
@@ -19,6 +18,8 @@ With its ability to switch seamlessly between online and offline map modes, the 
 -   **Fully Responsive Design:** Enjoy a seamless and intuitive experience across all devices, with layouts optimized for desktops, tablets, and mobile screens.
 -   **Interactive Popups:** Tap on device markers to reveal detailed information, including the assigned device name, user identification, and the precise timestamp of the last update.
 -   **Personalized User Authentication:** Allow users to assign custom names for easy identification, or fall back on the device’s default name for convenience.
+-   **Audio Communication:** Utilize WebRTC technology to enable real-time audio communication between connected devices, enhancing coordination and interaction.
+
 ---
 
 ## Folder Structure
@@ -29,8 +30,8 @@ realtime-location-tracker/
 │   ├── assets/
 │   ├── css/
 │   ├── js/
-│   └── views/
-│       └── index.ejs
+│── views/
+│   └── index.ejs
 ├── app.js
 ├── package.json
 ├── package-lock.json
@@ -70,7 +71,8 @@ realtime-location-tracker/
    - Use tools like [TileMill](https://tilemill-project.github.io/) or [MapTiler](https://www.maptiler.com/) to generate offline map tiles.
    - Place the generated tiles in the `public/tiles/offline-map-tiles/` directory.
 
-5. 
+5. **Configure WebRTC:**
+   - Set up WebRTC for audio communication by following the official [WebRTC documentation](https://webrtc.org/getting-started/).
 
 6. **Run the Application:**
 
@@ -100,12 +102,16 @@ realtime-location-tracker/
 4. **Interact with Markers:**
    - Click on a marker to view additional information about the device.
 
+5. **Initiate Audio Communication:**
+   - Use the audio communication feature to talk to other connected devices in real-time.
+
 ---
 
 ## Contributing
 We welcome contributions from the community! To contribute:
 
 1. Fork the repository.
+
 2. Create a new branch:
    ```bash
    git checkout -b feature-branch

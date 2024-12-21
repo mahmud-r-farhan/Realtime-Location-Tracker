@@ -21,14 +21,15 @@ app.get('/developer', (req, res) => {
 });
 
 const connectedDevices = new Map();
+const peers = {};
 
 io.on('connection', (socket) => {
-    console.log('New Device Connected');
+    console.log('A user connected');
     io.emit('update-user-count', connectedDevices.size);
+    peers[socket.id] = { socket };
 
     socket.on('send-location', (data) => {
         const { latitude, longitude, deviceName, accuracy } = data;
-        console.log(deviceName)
         connectedDevices.set(socket.id, { latitude, longitude, deviceName, accuracy });
         io.emit('receive-location', { id: socket.id, ...data });
         io.emit('update-device-list', Array.from(connectedDevices.entries()));
@@ -42,16 +43,57 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('user-audio', (data) => {
+        socket.broadcast.emit('user-audio', data);
+    });
+
+    socket.on('toggle-speaker', (data) => {
+        socket.broadcast.emit('toggle-speaker', data);
+    });
+
+    socket.on('join-audio', (userData) => {
+        socket.broadcast.emit('user-connected', { peerId: socket.id });
+    });
+
+    socket.on('ice-candidate', ({ target, candidate }) => {
+        if (peers[target]) {
+            peers[target].socket.emit('ice-candidate', {
+                peerId: socket.id,
+                candidate
+            });
+        }
+    });
+
+    socket.on('offer', ({ target, description }) => {
+        if (peers[target]) {
+            peers[target].socket.emit('offer', {
+                peerId: socket.id,
+                description
+            });
+        }
+    });
+
+    socket.on('answer', ({ target, description }) => {
+        if (peers[target]) {
+            peers[target].socket.emit('answer', {
+                peerId: socket.id,
+                description
+            });
+        }
+    });
+
     socket.on('disconnect', () => {
-        console.log('Device disconnected');
+        console.log('A user disconnected');
         connectedDevices.delete(socket.id);
         io.emit('user-disconnect', socket.id);
         io.emit('update-device-list', Array.from(connectedDevices.entries()));
         io.emit('update-user-count', connectedDevices.size);
+        delete peers[socket.id];
+        io.emit('user-disconnected', socket.id);
     });
 });
 
 const PORT = 3000;
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
