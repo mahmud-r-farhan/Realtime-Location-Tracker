@@ -34,7 +34,6 @@ realtime-location-tracker/
 │   └── index.ejs
 ├── app.js
 ├── package.json
-├── package-lock.json
 └── README.md
 ```
 
@@ -55,7 +54,8 @@ realtime-location-tracker/
 1. **Clone the Repository:**
    ```bash
    git clone https://github.com/mahmud-r-farhan/realtime-location-tracker.git
-   
+   ```
+   ```
    cd realtime-location-tracker
    ```
 
@@ -63,18 +63,19 @@ realtime-location-tracker/
    ```bash
    npm install
    ```
+* - optional for offline support
 
-3. **Download Leaflet Library:**
-   - Download the Leaflet library and place the CSS and JS files in the `public/leaflet/` directory.
+   1. **Download Leaflet Library:**
+      - Download the Leaflet library and place the CSS and JS files in the `public/leaflet/` directory.
 
-4. **Download Map Tiles:**
-   - Use tools like [TileMill](https://tilemill-project.github.io/) or [MapTiler](https://www.maptiler.com/) to generate offline map tiles.
-   - Place the generated tiles in the `public/tiles/offline-map-tiles/` directory.
+   2. **Download Map Tiles:**
+      - Use tools like [TileMill](https://tilemill-project.github.io/) or [MapTiler](https://www.maptiler.com/) to generate offline map tiles.
+      - Place the generated tiles in the `public/tiles/offline-map-tiles/` directory.
 
-5. **Configure WebRTC:**
-   - Set up WebRTC for audio communication by following the official [WebRTC documentation](https://webrtc.org/getting-started/).
+   3. **Configure WebRTC:**
+      - Set up WebRTC for audio communication by following the official [WebRTC documentation](https://webrtc.org/getting-started/).
 
-6. **Run the Application:**
+3. **Run the Application:**
 
     - Start the application normally:
    ```bash
