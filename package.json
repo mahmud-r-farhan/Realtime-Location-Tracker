@@ -1,6 +1,6 @@
 {
   "name": "realtime_tracker",
-  "version": "2.4.2",
+  "version": "3.5.7",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -15,7 +15,10 @@
     "compression": "^1.7.5",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
+    "express-rate-limit": "^7.5.0",
+    "http": "^0.0.1-security",
     "leaflet": "^1.9.4",
+    "path": "^0.12.7",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
