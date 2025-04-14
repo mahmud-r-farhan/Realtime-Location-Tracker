@@ -147,7 +147,7 @@ realtime-location-tracker/
 
 ---
 
-## 6. Usage
+## Usage
 
   
 1. Open `http://localhost:3007` in a web browser.
