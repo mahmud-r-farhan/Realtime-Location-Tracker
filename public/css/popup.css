@@ -1,0 +1,97 @@
+#name-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(24, 22, 22, 0.938);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+#name-popup.hidden {
+    display: none;
+}
+
+.popup-content {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 1 2px 10px rgba(21, 21, 21, 0.9);
+    text-align: center;
+}
+
+.popup-content h2 {
+    margin-bottom: 15px;
+    padding: 5px;
+}
+
+.popup-content input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.popup-buttons {
+    display: flex;
+    justify-content: space-between;
+}
+
+.popup-buttons button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#continue-btn {
+    background-color: #007bff;
+    color: #fff;
+}
+
+#continue-btn:hover {
+    background-color: #0056b3;
+}
+
+#cancel-btn {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+#cancel-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.leaflet-popup-content {
+    min-width: 250px;
+    padding: 10px;
+}
+
+.device-popup {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.device-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.device-popup-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.device-popup-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+}

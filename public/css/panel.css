@@ -1,0 +1,17 @@
+#info-panel {
+    padding: 20px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+
+#info-panel h2 {
+    font-size: 1.2em;
+    color: #333;
+}
+
+#info-panel h2 {
+    padding-left: 2px;
+    font-size: 1.2em;
+    color: #333;
+}

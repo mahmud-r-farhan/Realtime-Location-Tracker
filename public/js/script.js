@@ -15,7 +15,7 @@ const icons = {
 function initMap() {
     map = L.map('map').setView([0, 0], 3);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://gravatar.com/floawd">Mahmud R. Farhan</a>'
+        attribution: '&copy; <a href="https://gravatar.com/floawd">Mahmudur Rahman</a>'
     }).addTo(map);
 }
 

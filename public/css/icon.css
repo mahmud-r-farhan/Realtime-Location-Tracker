@@ -1,0 +1,5 @@
+.device-icon.android-device { background-image: url('../assets/android-log.png'); }
+.device-icon.ios-device { background-image: url('../assets/ios-log.png'); }
+.device-icon.windows-pc { background-image: url('../assets/windows-log.png'); }
+.device-icon.mac { background-image: url('../assets/mac-log.png'); }
+.device-icon.unknown-device { background-image: url('../assets/unknown-log.gif'); }

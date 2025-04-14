@@ -1,0 +1,87 @@
+#notification-panel {
+    position: fixed;
+    top: 60px;
+    left: 30px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    width: 300px;
+    z-index: 800;
+    transition: all 0.3s ease;
+    user-select: none;
+    transition: transform 0.15s ease;
+}
+
+.drag-handle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: move;
+}
+
+#notification-panel.minimized .notification-content {
+    display: none;
+}
+
+.notification-header {
+    padding: 12px 15px;
+    background: #2c3e50;
+    color: white;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-header:active {
+    cursor: grabbing;
+}
+
+#notification-toggle {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.notification-content {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+#notification-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#notification-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 14px;
+    animation: fadeIn 0.3s ease;
+    position: relative;
+    padding: 8px 12px;
+}
+
+#notification-list li:last-child {
+    border-bottom: none;
+}
+
+.notification-time {
+    color: #666;
+    font-size: 12px;
+    margin-right: 5px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.hidden {
+    display: none;
+}
