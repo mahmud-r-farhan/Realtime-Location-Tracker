@@ -15,7 +15,7 @@ const icons = {
 function initMap() {
     map = L.map('map').setView([0, 0], 3);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://gravatar.com/floawd">Mahmudur Rahman</a>'
+        attribution: '&copy; <a href="https://gravatar.com/floawd">Mahmud R.</a>'
     }).addTo(map);
 }
 
@@ -160,24 +160,28 @@ function showDeviceInfo(device) {
 function updateDeviceList(devices) {
     const deviceList = document.getElementById('device-list');
     deviceList.innerHTML = '';
-    devices.forEach(([id, device]) => {
+    devices.forEach(([id, device]) => { 
         const li = document.createElement('li');
-        li.innerHTML = `
-            <span class="device-icon ${getDeviceIcon(device.deviceName).toLowerCase().replace(' ', '-')}"></span>
+        li.innerHTML = 
+            `<span class="device-icon ${getDeviceIcon(device.deviceName).toLowerCase().replace(' ', '-')}"></span>
             <span class="device-name">${device.deviceName}</span>
-            <span class="device-info"><i class="fas fa-info-circle"></i></span>
-        `;
+            <span class="device-info"><i class="fas fa-info-circle"></i></span>`
+            ;
         li.addEventListener('click', () => {
-            // Update map view immediately with existing device data
             map.setView([device.latitude, device.longitude], 15);
-            // Also request latest location update
             socket.emit('request-device-location', id);
         });
         
         const infoIcon = li.querySelector('.device-info');
         infoIcon.addEventListener('click', (e) => {
             e.stopPropagation();
-            showDeviceInfo(device);
+            if (markers[id]) {
+                map.setView(markers[id].getLatLng(), 15);
+                markers[id].openPopup();
+            } else {
+                console.warn(`Marker with id ${id} not found for device ${device.deviceName}. Falling back to showDeviceInfo with potentially stale data.`);
+                showDeviceInfo(device); 
+            }
         });
         
         deviceList.appendChild(li);
@@ -493,11 +497,8 @@ async function sendMessage() {
     if (!message) return;
 
     messageInput.value = '';
-    
-    // Add message to chat immediately for better UX
     addMessageToChat(message, true);
-    
-    // Send message to server
+
     socket.emit('chat-message', {
         text: message,
         sender: userName || deviceName,
@@ -612,7 +613,7 @@ function setupDraggable(element, handle) {
     document.addEventListener('mouseup', onMouseUp);
 }
 
-// Initialize draggable notification panel
+// draggable notification panel
 setupDraggable(
     document.getElementById('notification-panel'),
     document.querySelector('.drag-handle')
