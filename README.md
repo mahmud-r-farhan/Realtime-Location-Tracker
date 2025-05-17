@@ -139,7 +139,7 @@ This latest version introduces **enhanced real-time tracking, better device insi
 realtime-location-tracker/
 
 ``
-project/
+realtime-location-tracker/
 ├── public/
 │   ├── assets/
 │   │   ├── android-log.png
@@ -175,9 +175,10 @@ project/
 │   │   ├── audio.js
 ├── views/
 │   ├── index.ejs
-├── server.js
+├── app.js
 ├── package.json
 ├── README.md
+├── dockerfile
 ``
 
 ```
