@@ -1,6 +1,6 @@
 {
   "name": "realtime_tracker",
-  "version": "3.5.7",
+  "version": "3.8.9",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "Mahmud R.",
   "license": "ISC",
   "description": "",
   "dependencies": {
@@ -19,6 +19,7 @@
     "http": "^0.0.1-security",
     "leaflet": "^1.9.4",
     "path": "^0.12.7",
+    "sanitize-html": "^2.13.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
