@@ -1,8 +1,9 @@
-import { updateMarker, removeMarker, focusMapOnDevice } from './map.js';
+import { updateMarker, removeMarker, focusMapOnDevice, markers } from './map.js'; // Added markers
 import { updateDeviceList, updateUserCount } from './ui.js';
 import { addNotification } from './notification.js';
 import { addMessageToChat } from './chat.js';
 import { createPeerConnection, handleOffer, handleAnswer, handleIceCandidate, closePeerConnection } from './audio.js';
+import { getDeviceName } from './device.js'; // Added for userName check
 
 export const socket = io({
     reconnectionAttempts: 5,
@@ -68,12 +69,11 @@ export function initSocketEventHandlers() {
     });
 
     socket.on('chat-message', (data) => {
-        if (data.sender !== (localStorage.getItem('userName') || getDeviceName())) {
+        const userName = localStorage.getItem('userName') || getDeviceName();
+        if (data.sender !== userName) {
             addMessageToChat(data, false);
         }
     });
-
-    // Note: 'user-audio' and 'toggle-speaker' are not handled as they seem server-specific and unsupported
 }
 
 export function emitSendLocation(locationData) {

@@ -1,4 +1,4 @@
-import { focusMapOnDevice, openDevicePopup, showDeviceInfo } from './map.js';
+import { focusMapOnDevice, openDevicePopup, showDeviceInfo, markers } from './map.js'; 
 import { emitRequestDeviceLocation } from './socket.js';
 import { getDeviceIcon } from './device.js';
 
