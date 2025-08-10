@@ -3,7 +3,7 @@ import { updateDeviceList, updateUserCount } from './ui.js';
 import { addNotification } from './notification.js';
 import { addMessageToChat } from './chat.js';
 import { createPeerConnection, handleOffer, handleAnswer, handleIceCandidate, closePeerConnection } from './audio.js';
-import { getDeviceName } from './device.js'; // Added for userName check
+import { getDeviceName } from './device.js'; 
 
 export const socket = io({
     reconnectionAttempts: 5,

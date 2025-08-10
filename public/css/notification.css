@@ -1,11 +1,11 @@
 #notification-panel {
     position: fixed;
-    top: 60px;
-    left: 30px;
+    top: 75px;
+    left: 35px;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-    width: 300px;
+    width: 280px;
     z-index: 800;
     transition: all 0.3s ease;
     user-select: none;
@@ -25,7 +25,7 @@
 
 .notification-header {
     padding: 12px 15px;
-    background: #2c3e50;
+    background: var(--gradient-primary);
     color: white;
     border-radius: 8px 8px 0 0;
     display: flex;

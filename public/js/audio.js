@@ -106,6 +106,5 @@ export function initAudioControls() {
     document.getElementById('speaker-btn').addEventListener('click', () => {
         speakerEnabled = !speakerEnabled;
         document.querySelector('#speaker-btn img').src = speakerEnabled ? '/assets/speaker-on-icon.png' : '/assets/speaker-off-icon.png';
-        // Note: Removed 'toggle-speaker' emit as it's not supported by server
     });
 }

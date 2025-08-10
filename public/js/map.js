@@ -7,7 +7,7 @@ export const markers = {};
 export function initMap(mapId = 'map') {
     map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">Mahmud'
     }).addTo(map);
     return map;
 }
@@ -50,8 +50,8 @@ function createPopupContent(data) {
     return `
         <div class="device-popup">
             <div class="device-popup-header">
-                <img class="device-popup-icon" src="../assets/${iconKey.toLowerCase().replace(' ', '-')}-log.png" alt="Device">
-                <span class="device-popup-name">${deviceName}</span>
+                <img class="device-popup-icon"  src="../assets/${iconKey.toLowerCase().replace(' ', '-')}-log.png" alt="Device">
+                <span class="device-popup-name"  style="font-size: 20px;">${deviceName}</span>
             </div>
             <div class="device-info-grid">
                 <div class="device-info-item">

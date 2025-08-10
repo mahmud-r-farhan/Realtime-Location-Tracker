@@ -1,38 +1,50 @@
 #audio-controls {
-    display: flex;
-    justify-content: start;
-    align-items: center;
-    background-color: #3333337b;
-    border-radius: 3px;
-    padding: 6px;
-    width: 100%;
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    margin-bottom: 10px;
-    z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--gradient-accent);
+  border-radius: var(--border-radius);
+  padding: 14px 16px;
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  box-shadow: var(--shadow-medium);
+  backdrop-filter: blur(10px);
 }
 
 #audio-controls button {
-    padding: 8px;
-    background-color: #f6f5f565;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    margin: 0 5px;
-    transition: background-color .3s ease;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.245);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  margin: 0 8px;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(10px);
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #audio-controls button:hover {
-    background-color: #f32525;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
 }
 
 #audio-controls button:active {
-    background-color: #157347;
-    transition: background-color .1s ease;
+  transform: scale(0.95);
+}
+
+#audio-controls button:focus{
+    background-color: rgba(255, 0, 0, 0.763);
+    border: solid rgba(255, 255, 255, 0.829) 2px;
 }
 
 #audio-controls button img {
-    width: 25px;
-    height: 25px;
+  width: 28px;
+  height: 28px;
+  filter: brightness(0) invert(1);
 }
