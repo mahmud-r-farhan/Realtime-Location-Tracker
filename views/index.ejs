@@ -1,52 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        
-        <!-- SEO Meta Tags -->
-        <title>Real-Time Location Tracker - Track & Monitor Live Locations</title>
-        <meta name="description" content="Real-Time Location Tracker is a web application for tracking and monitoring real-time locations with WebSockets, Leaflet, and WebRTC. Stay connected and track movement seamlessly.">
-        <meta name="keywords" content="Real-Time Location Tracker, Live Location Tracking, GPS Tracker, WebRTC, WebSockets, Leaflet, Online Tracking, Near me, neighbour, neighbor, location, real-time, monitor, track, movement, map, live, web application, web development, Mahmudur Rahman">
-        <meta name="author" content="Mahmudur Rahman">
-        
-        <!-- Open Graph (OG) for Social Media -->
-        <meta property="og:title" content="Real-Time Location Tracker - Track & Monitor Live Locations">
-        <meta property="og:description" content="Monitor real-time locations seamlessly using WebRTC and WebSockets with an interactive map powered by Leaflet.">
-        <meta property="og:image" content="https://res.cloudinary.com/dqovjmmlx/image/upload/v1739883223/aaaaaaaa_hnn63s.jpg">
-        <meta property="og:url" content="https://realtime-location-tracker-v9ow.onrender.com/">
-        <meta property="og:type" content="website">
-        
-        <!-- Twitter Card for Social Sharing -->
-        <meta name="twitter:card" content="summary_large_image">
-        <meta name="twitter:title" content="Real-Time Location Tracker">
-        <meta name="twitter:description" content="Track and monitor real-time locations with ease.">
-        <meta name="twitter:image" content="https://res.cloudinary.com/dqovjmmlx/image/upload/v1739883223/aaa_vfrek4.jpg">
-        <meta name="twitter:site" content="@your_twitter_handle">
-    
-        <!-- Favicon -->
-        <link rel="icon" type="image/png" href="assets/favico.png">
-    
-        <!-- Stylesheets -->
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-        <link rel="stylesheet" href="/css/style.css">
-        <link rel="stylesheet" href="/css/panel.css">
-        <link rel="stylesheet" href="/css/device.css">
-        <link rel="stylesheet" href="/css/chat.css">
-        <link rel="stylesheet" href="/css/audio.css">
-        <link rel="stylesheet" href="/css/notification.css">
-        <link rel="stylesheet" href="/css/popup.css">
-        <link rel="stylesheet" href="/css/responsive.css">
-        <link rel="stylesheet" href="/css/icon.css">
-    
-        <!-- Canonical URL -->
-        <link rel="canonical" href="https://realtime-location-tracker-v9ow.onrender.com/">
-    
-        <!-- Robots Meta Tag -->
-        <meta name="robots" content="index, follow">
-    </head>
-    
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- SEO Meta Tags -->
+    <title>Real-Time Location Tracker - Track & Monitor Live Locations</title>
+    <meta name="description"
+        content="Real-Time Location Tracker is a web application for tracking and monitoring real-time locations with WebSockets, Leaflet, and WebRTC. Stay connected and track movement seamlessly.">
+    <meta name="keywords"
+        content="Real-Time Location Tracker, Live Location Tracking, GPS Tracker, WebRTC, WebSockets, Leaflet, Online Tracking, Near me, neighbour, neighbor, location, real-time, monitor, track, movement, map, live, web application, web development, Mahmudur Rahman">
+    <meta name="author" content="Mahmudur Rahman">
+
+    <!-- Open Graph (OG) for Social Media -->
+    <meta property="og:title" content="Real-Time Location Tracker - Track & Monitor Live Locations">
+    <meta property="og:description"
+        content="Monitor real-time locations seamlessly using WebRTC and WebSockets with an interactive map powered by Leaflet.">
+    <meta property="og:image"
+        content="https://res.cloudinary.com/dqovjmmlx/image/upload/v1739883223/aaaaaaaa_hnn63s.jpg">
+    <meta property="og:url" content="https://realtime-location-tracker-v9ow.onrender.com/">
+    <meta property="og:type" content="website">
+
+    <!-- Twitter Card for Social Sharing -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Real-Time Location Tracker">
+    <meta name="twitter:description" content="Track and monitor real-time locations with ease.">
+    <meta name="twitter:image" content="https://res.cloudinary.com/dqovjmmlx/image/upload/v1739883223/aaa_vfrek4.jpg">
+    <meta name="twitter:site" content="@your_twitter_handle">
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Location Tracker">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/assets/icons/icon.svg">
+    <link rel="apple-touch-icon" sizes="152x152" href="/assets/icons/icon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/icon.svg">
+    <link rel="apple-touch-icon" sizes="167x167" href="/assets/icons/icon.svg">
+
+    <!-- Microsoft Tile -->
+    <meta name="msapplication-TileColor" content="#1a1a2e">
+    <meta name="msapplication-TileImage" content="/assets/icons/icon.svg">
+    <meta name="msapplication-config" content="none">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/favico.png">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/panel.css">
+    <link rel="stylesheet" href="/css/device.css">
+    <link rel="stylesheet" href="/css/chat.css">
+    <link rel="stylesheet" href="/css/audio.css">
+    <link rel="stylesheet" href="/css/notification.css">
+    <link rel="stylesheet" href="/css/popup.css">
+    <link rel="stylesheet" href="/css/responsive.css">
+    <link rel="stylesheet" href="/css/icon.css">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://realtime-location-tracker-v9ow.onrender.com/">
+
+    <!-- Robots Meta Tag -->
+    <meta name="robots" content="index, follow">
+</head>
+
 <body>
     <div id="map"></div>
     <div id="sidebar" class="collapsed">
@@ -71,10 +95,8 @@
     </div>
     <div id="name-popup" class="hidden">
         <div class="popup-content">
-            <h2>Welcome to Real-Time Location Tracker 
-                <img src="/assets/icons8-location.gif" 
-                style="width: 26px; height: auto;"
-                alt="icon-gif">
+            <h2>Welcome to Real-Time Location Tracker
+                <img src="/assets/icons8-location.gif" style="width: 26px; height: auto;" alt="icon-gif">
             </h2>
             <p>Assigned name:</p>
             <input type="text" id="user-name-input" placeholder="Enter Name (optional)">
@@ -115,10 +137,12 @@
         <span class="chat-notification hidden"></span>
         <i class="fas fa-comments"></i>
     </div>
-    
+
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/pwa.js"></script>
     <script type="module" src="/js/main.js"></script>
     <!-- <script src="/js/script/script.js"></script> -->
 </body>
+
 </html>
