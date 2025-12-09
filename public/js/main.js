@@ -1,11 +1,15 @@
-import { initMap } from './map.js';
+import { initMap, focusMapOnDevice } from './map.js';
 import { getDeviceName, getDeviceInfo } from './device.js';
 import { showNamePopup, hideNamePopup, getUserNameInput, initSidebar, setupContinueButton } from './ui.js';
 import { initNotificationPanel, addNotification } from './notification.js';
 import { initSocketEventHandlers, emitSendLocation } from './socket.js';
 import { initAudioControls } from './audio.js';
 import { initChat, setCurrentChatUser } from './chat.js';
+import { initSOS } from './sos.js';
 import { LOCATION_SEND_INTERVAL } from './config.js';
+
+// Expose focusMapOnDevice globally for SOS
+window.focusMapOnLocation = focusMapOnDevice;
 
 let userName = localStorage.getItem('userName') || '';
 const deviceName = getDeviceName();
@@ -56,6 +60,7 @@ function initializeApp() {
     initChat();
     initNotificationPanel();
     initSocketEventHandlers();
+    initSOS();
     startLocationUpdates();
     addNotification('App initialized. Sharing location...');
 }

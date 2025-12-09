@@ -1,7 +1,7 @@
 #notification-panel {
     position: fixed;
-    top: 75px;
-    left: 35px;
+    top: 90px;
+    left: 40px;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);

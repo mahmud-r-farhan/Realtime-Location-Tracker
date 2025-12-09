@@ -1,9 +1,18 @@
-import { updateMarker, removeMarker, focusMapOnDevice, markers } from './map.js'; // Added markers
+import { updateMarker, removeMarker, focusMapOnDevice, markers } from './map.js';
 import { updateDeviceList, updateUserCount } from './ui.js';
 import { addNotification } from './notification.js';
 import { addMessageToChat } from './chat.js';
-import { createPeerConnection, handleOffer, handleAnswer, handleIceCandidate, closePeerConnection } from './audio.js';
-import { getDeviceName } from './device.js'; 
+import {
+    createPeerConnection,
+    handleOffer,
+    handleAnswer,
+    handleIceCandidate,
+    closePeerConnection,
+    handleUserConnectedToAudio,
+    handleUserDisconnectedFromAudio,
+    handleAudioPeersList
+} from './audio.js';
+import { getDeviceName } from './device.js';
 
 export const socket = io({
     reconnectionAttempts: 5,
@@ -50,17 +59,32 @@ export function initSocketEventHandlers() {
         updateUserCount(count);
     });
 
+    // WebRTC Audio Events
     socket.on('user-connected', async ({ peerId, userName }) => {
         const displayName = userName || 'A new user';
-        addNotification(`${displayName} has connected`);
-        createPeerConnection(peerId);
+        console.log(`User connected to audio: ${displayName} (${peerId})`);
+        handleUserConnectedToAudio(peerId, displayName);
+    });
+
+    socket.on('user-disconnected', ({ peerId, userName }) => {
+        const displayName = userName || 'A user';
+        console.log(`User disconnected from audio: ${displayName} (${peerId})`);
+        handleUserDisconnectedFromAudio(peerId);
+    });
+
+    // Handle list of current audio peers when joining
+    socket.on('audio-peers', (peers) => {
+        console.log('Received audio peers:', peers);
+        handleAudioPeersList(peers);
     });
 
     socket.on('offer', async ({ peerId, description }) => {
+        console.log(`Received offer from ${peerId}`);
         await handleOffer(peerId, description);
     });
 
     socket.on('answer', async ({ peerId, description }) => {
+        console.log(`Received answer from ${peerId}`);
         await handleAnswer(peerId, description);
     });
 

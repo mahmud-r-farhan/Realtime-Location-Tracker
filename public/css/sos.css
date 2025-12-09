@@ -1,0 +1,476 @@
+/* SOS Button */
+.sos-button {
+    position: fixed;
+    top: 20px;
+    left: 60px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    border: 3px solid #fff;
+    box-shadow: 0 4px 20px rgba(220, 38, 38, 0.5), 0 0 0 4px rgba(220, 38, 38, 0.2);
+    cursor: pointer;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.sos-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 30px rgba(220, 38, 38, 0.6), 0 0 0 6px rgba(220, 38, 38, 0.3);
+}
+
+.sos-text {
+    color: #fff;
+    font-weight: 800;
+    font-size: 16px;
+    letter-spacing: 1px;
+    z-index: 2;
+}
+
+.sos-progress {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.3);
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 2s linear;
+}
+
+.sos-button.holding .sos-progress {
+    transform: scaleY(1);
+}
+
+.sos-button.triggered {
+    animation: sosPulse 0.5s ease infinite;
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+}
+
+.sos-button.incoming {
+    animation: sosFlash 0.3s ease infinite;
+}
+
+@keyframes sosPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.15);
+    }
+}
+
+@keyframes sosFlash {
+
+    0%,
+    100% {
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+    }
+
+    50% {
+        background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+    }
+}
+
+/* SOS Modal */
+.sos-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+}
+
+.sos-modal.hidden {
+    display: none;
+}
+
+.sos-modal-content {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 20px;
+    max-width: 500px;
+    width: 100%;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.sos-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.sos-modal-header h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.3rem;
+}
+
+.sos-modal-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 28px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+    line-height: 1;
+}
+
+.sos-modal-close:hover {
+    opacity: 1;
+}
+
+.sos-modal-body {
+    padding: 0;
+}
+
+/* Tabs */
+.sos-tabs {
+    display: flex;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.sos-tab {
+    flex: 1;
+    padding: 15px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s;
+    border-bottom: 2px solid transparent;
+}
+
+.sos-tab:hover {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sos-tab.active {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom-color: #dc2626;
+}
+
+.tab-icon {
+    font-size: 18px;
+}
+
+.sos-count {
+    background: #dc2626;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.sos-count.hidden {
+    display: none;
+}
+
+/* Tab Content */
+.sos-tab-content {
+    display: none;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sos-tab-content.active {
+    display: block;
+}
+
+/* Alerts List */
+.sos-alerts-list {
+    padding: 15px;
+}
+
+.sos-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.sos-empty-icon {
+    display: block;
+    font-size: 48px;
+    margin-bottom: 15px;
+    color: #22c55e;
+}
+
+.sos-empty p {
+    margin: 0 0 5px;
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sos-empty small {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.sos-alert-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 12px;
+    border-left: 4px solid #dc2626;
+}
+
+.sos-alert-item.own {
+    border-left-color: #3b82f6;
+}
+
+.sos-alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.sos-alert-sender {
+    font-weight: 600;
+    color: #fff;
+    font-size: 15px;
+}
+
+.sos-alert-time {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+}
+
+.sos-alert-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.sos-detail {
+    font-size: 12px;
+}
+
+.detail-label {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.detail-value {
+    color: #fff;
+    margin-left: 4px;
+}
+
+.sos-alert-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.sos-action-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.sos-action-btn.view-map {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+}
+
+.sos-action-btn.dismiss {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sos-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Send SOS Section */
+.sos-send-section {
+    padding: 25px 20px;
+    text-align: center;
+}
+
+.sos-instruction {
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 25px;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.sos-trigger-area {
+    margin-bottom: 25px;
+}
+
+.sos-trigger-button {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border: 4px solid #fff;
+    box-shadow: 0 8px 40px rgba(220, 38, 38, 0.5);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sos-trigger-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 50px rgba(220, 38, 38, 0.6);
+}
+
+.sos-trigger-text {
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    z-index: 2;
+    position: relative;
+    text-align: center;
+    line-height: 1.4;
+}
+
+.sos-trigger-progress {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.3);
+    transform: scaleY(0);
+    transform-origin: bottom;
+    transition: transform 2s linear;
+}
+
+.sos-trigger-button.holding .sos-trigger-progress {
+    transform: scaleY(1);
+}
+
+.sos-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    text-align: left;
+}
+
+.sos-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.feature-icon {
+    font-size: 20px;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .sos-button {
+        width: 50px;
+        height: 50px;
+        top: 15px;
+        right: 15px;
+    }
+
+    .sos-text {
+        font-size: 13px;
+    }
+
+    .sos-modal-content {
+        border-radius: 15px;
+        margin: 10px;
+    }
+
+    .sos-modal-header {
+        padding: 15px;
+    }
+
+    .sos-modal-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .sos-trigger-button {
+        width: 120px;
+        height: 120px;
+    }
+
+    .sos-trigger-text {
+        font-size: 11px;
+    }
+
+    .sos-features {
+        grid-template-columns: 1fr;
+    }
+
+    .sos-alert-details {
+        grid-template-columns: 1fr;
+    }
+
+    .sos-tab {
+        padding: 12px 8px;
+        font-size: 12px;
+    }
+}
+
+/* Scrollbar */
+.sos-tab-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sos-tab-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sos-tab-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.sos-tab-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

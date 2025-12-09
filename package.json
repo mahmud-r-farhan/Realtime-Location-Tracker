@@ -1,6 +1,7 @@
 {
   "name": "realtime_tracker",
-  "version": "3.8.9",
+  "version": "4.0.0",
+  "description": "Real-Time Location Tracker with SOS Emergency alerts, PWA support, WebRTC audio, and live chat",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -8,9 +9,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "Mahmud R.",
+  "author": "Mahmud Rahman",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "compression": "^1.7.5",
     "ejs": "^3.1.10",

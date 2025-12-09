@@ -63,6 +63,7 @@
     <link rel="stylesheet" href="/css/popup.css">
     <link rel="stylesheet" href="/css/responsive.css">
     <link rel="stylesheet" href="/css/icon.css">
+    <link rel="stylesheet" href="/css/sos.css">
 
     <!-- Canonical URL -->
     <link rel="canonical" href="https://realtime-location-tracker-v9ow.onrender.com/">
@@ -138,11 +139,82 @@
         <i class="fas fa-comments"></i>
     </div>
 
+    <!-- SOS Button -->
+    <button id="sos-btn" class="sos-button" title="Hold for 2 seconds to send emergency alert"
+        onclick="if(!this.classList.contains('holding')) { document.getElementById('sos-modal').classList.remove('hidden'); }">
+        <span class="sos-text">SOS</span>
+        <span class="sos-progress"></span>
+    </button>
+
+    <!-- SOS Modal -->
+    <div id="sos-modal" class="sos-modal hidden" onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="sos-modal-content">
+            <div class="sos-modal-header">
+                <h2>🚨 Emergency SOS</h2>
+                <button id="sos-modal-close" class="sos-modal-close"
+                    onclick="document.getElementById('sos-modal').classList.add('hidden')">&times;</button>
+            </div>
+            <div class="sos-modal-body">
+                <div class="sos-tabs">
+                    <button class="sos-tab active" data-tab="alerts"
+                        onclick="document.querySelectorAll('.sos-tab').forEach(t=>t.classList.remove('active')); document.querySelectorAll('.sos-tab-content').forEach(c=>c.classList.remove('active')); this.classList.add('active'); document.getElementById('sos-tab-alerts').classList.add('active');">
+                        <span class="tab-icon">📢</span>
+                        SOS Alerts
+                        <span id="sos-count" class="sos-count hidden">0</span>
+                    </button>
+                    <button class="sos-tab" data-tab="send"
+                        onclick="document.querySelectorAll('.sos-tab').forEach(t=>t.classList.remove('active')); document.querySelectorAll('.sos-tab-content').forEach(c=>c.classList.remove('active')); this.classList.add('active'); document.getElementById('sos-tab-send').classList.add('active');">
+                        <span class="tab-icon">🆘</span>
+                        Send SOS
+                    </button>
+                </div>
+                <div id="sos-tab-alerts" class="sos-tab-content active">
+                    <div id="sos-alerts-list" class="sos-alerts-list">
+                        <div class="sos-empty">
+                            <span class="sos-empty-icon">✓</span>
+                            <p>No active SOS alerts</p>
+                            <small>All users are safe</small>
+                        </div>
+                    </div>
+                </div>
+                <div id="sos-tab-send" class="sos-tab-content">
+                    <div class="sos-send-section">
+                        <p class="sos-instruction">Hold the SOS button for 2 seconds to send an emergency alert to all
+                            connected users.</p>
+                        <div class="sos-trigger-area">
+                            <button id="sos-trigger-btn" class="sos-trigger-button">
+                                <span class="sos-trigger-text">HOLD TO SEND SOS</span>
+                                <span class="sos-trigger-progress"></span>
+                            </button>
+                        </div>
+                        <div class="sos-features">
+                            <div class="sos-feature">
+                                <span class="feature-icon">📍</span>
+                                <span>Your real-time location</span>
+                            </div>
+                            <div class="sos-feature">
+                                <span class="feature-icon">📱</span>
+                                <span>Device information</span>
+                            </div>
+                            <div class="sos-feature">
+                                <span class="feature-icon">🌐</span>
+                                <span>IP address & location</span>
+                            </div>
+                            <div class="sos-feature">
+                                <span class="feature-icon">🔔</span>
+                                <span>Instant notification</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/pwa.js"></script>
     <script type="module" src="/js/main.js"></script>
-    <!-- <script src="/js/script/script.js"></script> -->
 </body>
 
 </html>

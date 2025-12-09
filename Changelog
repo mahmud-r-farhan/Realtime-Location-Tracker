@@ -1,0 +1,19 @@
+## Changelog
+
+### v4.0.0 (Latest)
+- ✨ Added SOS Emergency feature with 2-second hold trigger
+- ✨ Added PWA support with offline functionality
+- ✨ Added browser push notifications
+- ✨ Added IP geolocation for SOS alerts
+- 🎨 New SOS modal UI
+- 🔊 Added audio alerts for SOS
+
+### v3.5.7
+- Enhanced device popups with battery and connection info
+- Added activity logs
+- Added live chat messaging
+
+### v2.4.2
+- Added audio communication via WebRTC
+- Improved device detection
+- Enhanced responsive design
