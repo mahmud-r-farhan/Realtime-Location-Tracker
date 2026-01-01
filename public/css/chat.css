@@ -4,13 +4,14 @@
     left: 20px;
     width: 320px;
     height: 480px;
-    background: white;
+    background: var(--panel-bg);
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
     z-index: 1000;
     transition: transform 0.3s ease, opacity 0.3s ease;
+    color: var(--text-primary);
 }
 
 #chat-panel.hidden {
@@ -74,8 +75,8 @@
 }
 
 .message.received {
-    background: var(--gradient-accent);
-    color: #1c1e21;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
     margin-right: auto;
     border-bottom-left-radius: 4px;
 }
@@ -88,12 +89,12 @@
 
 .message.received .message-info,
 .message.received .message-time {
-    color: rgba(0, 0, 0, 0.897);
+    color: var(--text-secondary);
 }
 
 .chat-input {
     padding: 12px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--border-color);
     display: flex;
     gap: 12px;
     align-items: center;
@@ -102,10 +103,12 @@
 #message-input {
     flex-grow: 1;
     padding: 10px 16px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--input-border);
     border-radius: 24px;
     font-size: 14px;
     transition: border-color 0.2s ease;
+    background: var(--input-bg);
+    color: var(--text-primary);
 }
 
 #message-input:focus {

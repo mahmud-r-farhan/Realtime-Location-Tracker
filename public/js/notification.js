@@ -1,9 +1,14 @@
 import { MAX_NOTIFICATIONS, NOTIFICATION_ACTIVE_TIMEOUT } from './config.js';
+import { playNotificationBeep } from './sounds.js';
 
 let activeNotifications = new Set();
 
 export function addNotification(message) {
     if (activeNotifications.has(message)) return;
+
+    // Play sound
+    playNotificationBeep();
+
     const list = document.getElementById('notification-list');
     const time = new Date().toLocaleTimeString();
     const li = document.createElement('li');

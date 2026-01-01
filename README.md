@@ -25,7 +25,9 @@ The application provides a responsive design for a consistent user experience ac
 
 ### Communication Features
 - **Audio Communication (WebRTC):** Real-time voice communication among connected devices
+- **Broadcast Call:** "Megaphone" feature to invite all users to a call
 - **Live Chat Messaging:** Send instant text messages using WebSockets
+- **Locate via Chat:** Click any message to instantly find the sender on the map
 - **Activity Logs:** A comprehensive log system that tracks server notifications, connection events, and disconnections
 
 ### 🆘 Emergency SOS Feature (NEW in v4.0)
@@ -50,46 +52,6 @@ The application provides a responsive design for a consistent user experience ac
 
 - Node.js: v18 or higher
 - npm: v8 or higher
-
----
-
-## Version Release
-
-### **Version 4.1 (Current)** – **Organization Rooms & Optimization**
-
-- **🏢 Organization/Fleet Rooms:** Users can now join specific "Organization IDs" to create private fleets. Only users in the same organization can see each other and chat.
-- **🔋 Battery Saver Protocol:** Intelligent motion detection slows down GPS updates when the device is stationary, significantly extending battery life.
-- **🗺️ Map Customization:** New Layer Control allows switching between OpenStreetMap, OpenTopoMap, Satellite (Esri), and Dark Mode.
-- **⚡ Bandwidth Optimization:** Room isolation prevents the $N^2$ scaling issue by limiting data broadcasts to room members only.
-
----
-
-### **Version 4.0** – **SOS Emergency & PWA Support**
-
-- **🆘 SOS Emergency System:** One-touch emergency alerts with comprehensive device and location data
-- **📱 PWA Support:** Full Progressive Web App with offline capabilities
-- **🔔 Enhanced Notifications:** Audio alerts and browser push notifications
-- **🔊 Enhanced Audio Communication (WebRTC):** Real-time voice communication among connected devices
-- **📍 IP Geolocation:** Additional location data from IP address
-- **🎨 Modern UI:** Beautiful, responsive modal for SOS management
-
-
----
-
-### **Version 3.0** – **Advanced Features & Performance Upgrades**
-
-- **Enhanced Interactive Popups:** Now includes real-time device details such as battery status, connection type, and more.
-- **Activity Logs:** A comprehensive log system that tracks server notifications, connection events, and disconnections.
-- **Live Chat Messaging:** Instant text communication between connected devices via WebSockets.
-
----
-
-### **Version 2.0** – **Major Enhancements & New Features**
-
-- **Real-Time Tracking:** Continuously updates device locations on the map
-- **Smart Device Identification:** Automatically detects and categorizes devices
-- **Device Connection Panel:** Displays a dynamic list of all connected devices
-- **Audio Communication:** Real-time voice communication between connected devices using WebRTC
 
 ---
 
@@ -200,7 +162,7 @@ http://localhost:3007
 
 ### Installing as PWA
 
-1. **Chrome/Edge (Desktop):** Click the install icon in the address bar
+1. **Chrome/Firefox (Desktop):** Click the install icon in the address bar
 2. **Chrome (Android):** Tap "Add to Home Screen" from the menu
 3. **Safari (iOS):** Tap Share → "Add to Home Screen"
 
@@ -216,6 +178,7 @@ http://localhost:3007
 | `send-location` | Client → Server | Send device location |
 | `receive-location` | Server → Client | Receive location updates (Room Scoped) |
 | `sos-alert` | Bidirectional | Emergency SOS broadcast (Room Scoped) |
+| `request-join-call` | Client → Server | Broadcast invitation to join call |
 | `chat-message` | Bidirectional | Chat messages (Room Scoped) |
 | `join-audio` | Client → Server | Join audio channel (Room Scoped) |
 | `user-connected` | Server → Client | New user notification |
@@ -245,17 +208,6 @@ docker run -p 3007:3007 --name tracker -d realtime-location-tracker
 ```
 
 ### Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  app:
-    build: .
-    ports:
-      - "3007:3007"
-    environment:
-      - NODE_ENV=production
-```
 
 ```bash
 docker-compose up -d

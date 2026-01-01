@@ -1,6 +1,7 @@
 import { WEBRTC_CONFIGURATION } from './config.js';
 import { socket, emitJoinAudio, emitLeaveAudio } from './socket.js';
 import { addNotification } from './notification.js';
+import { playCallRing } from './sounds.js';
 
 // Audio state management
 let localStream = null;
@@ -17,9 +18,6 @@ const pendingCandidates = {};
 let callStatusElement = null;
 let activeUsersElement = null;
 
-/**
- * Creates a peer connection for a specific peer
- */
 export function createPeerConnection(peerId) {
     // Close existing connection if any
     if (peerConnections[peerId]) {
@@ -154,6 +152,7 @@ function handlePeerDisconnected(peerId) {
  */
 export async function handleOffer(peerId, description) {
     console.log(`Handling offer from ${peerId}`);
+    playCallRing(); // Play ring sound on incoming offer
 
     let pc = peerConnections[peerId];
     if (!pc) {
@@ -473,9 +472,6 @@ function updateCallUI() {
     }
 }
 
-/**
- * Handle when another user connects to audio
- */
 export function handleUserConnectedToAudio(peerId, userName) {
     if (isInCall && localStream) {
         // Initiate call to the new peer
@@ -484,9 +480,6 @@ export function handleUserConnectedToAudio(peerId, userName) {
     updateCallUI();
 }
 
-/**
- * Handle when a user disconnects from audio
- */
 export function handleUserDisconnectedFromAudio(peerId) {
     closePeerConnection(peerId);
     updateCallUI();
@@ -543,6 +536,26 @@ export function initAudioControls() {
         speakerBtn.addEventListener('click', toggleSpeaker);
     }
 
+    // Listen for incoming call requests
+    socket.on('request-join-call', (data) => {
+        console.log('Received call request:', data);
+        addNotification(`📞 ${data.senderName} is inviting everyone to join the call!`);
+        playCallRing();
+
+        // Optional: Show a more prominent modal/alert if user isn't in call
+        if (!isInCall) {
+            // Simple visual pulse on the call button
+            const callBtn = document.getElementById('call-btn');
+            if (callBtn) {
+                callBtn.classList.add('pulse-animation'); // We'll assume this class exists or add inline animation
+                callBtn.style.animation = 'pulse 1s infinite';
+                setTimeout(() => {
+                    callBtn.style.animation = '';
+                }, 10000);
+            }
+        }
+    });
+
     // Add call button next to audio controls
     addJoinCallButton();
 
@@ -553,10 +566,50 @@ export function initAudioControls() {
 /**
  * Add a dedicated join/leave call button
  */
+/**
+ * Add join/leave and request call buttons
+ */
 function addJoinCallButton() {
     const audioControls = document.getElementById('audio-controls');
     if (!audioControls || document.getElementById('call-btn')) return;
 
+    // 1. Request All Button
+    const requestBtn = document.createElement('button');
+    requestBtn.id = 'request-call-btn';
+    requestBtn.innerHTML = `<i class="fas fa-bullhorn"></i>`; // Icon for "announce/call all"
+    requestBtn.title = 'Request everyone to join call';
+    requestBtn.style.cssText = `
+        padding: 12px;
+        background: rgba(33, 150, 243, 0.6); /* Blue */
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        margin: 0 8px;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        width: 52px;
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 18px;
+    `;
+
+    requestBtn.addEventListener('click', () => {
+        // Confirmation
+        if (confirm('📢 Send a request for everyone in the room to join the call?')) {
+            socket.emit('request-join-call');
+            addNotification('📡 Request sent to all users');
+
+            // Visual feedback
+            requestBtn.style.transform = 'scale(0.9)';
+            setTimeout(() => requestBtn.style.transform = 'scale(1)', 200);
+        }
+    });
+
+
+    // 2. Join/Leave Button
     const callBtn = document.createElement('button');
     callBtn.id = 'call-btn';
     callBtn.innerHTML = `<i class="fas fa-phone"></i>`;
@@ -587,7 +640,7 @@ function addJoinCallButton() {
             callBtn.title = 'Join Audio Call';
         } else {
             joinCall();
-            callBtn.style.background = 'rgba(244, 67, 54, 0.6)';
+            callBtn.style.background = 'rgba(244, 67, 54, 0.6)'; // Red
             callBtn.innerHTML = `<i class="fas fa-phone-slash"></i>`;
             callBtn.title = 'Leave Audio Call';
         }
@@ -596,11 +649,14 @@ function addJoinCallButton() {
     // Insert before mic button
     const micBtn = document.getElementById('mic-btn');
     if (micBtn) {
+        audioControls.insertBefore(requestBtn, micBtn);
         audioControls.insertBefore(callBtn, micBtn);
     } else {
+        audioControls.appendChild(requestBtn);
         audioControls.appendChild(callBtn);
     }
 }
+
 
 /**
  * Add styles for call status indicator

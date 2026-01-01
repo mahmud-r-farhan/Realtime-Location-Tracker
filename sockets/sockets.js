@@ -81,6 +81,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 deviceName: sanitizedDeviceName,
                 accuracy: data.accuracy,
                 deviceInfo: data.deviceInfo || {},
+                ip: socket.clientIP, // Add IP address
                 joinedAt: new Date(),
                 room: socket.room // Store room
             };
@@ -117,10 +118,15 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 allowedTags: [],
                 allowedAttributes: {}
             });
+
+            // Use sender from data if available (supports instant profile updates), else socket.deviceName
+            const senderName = data.sender ? sanitizeHtml(data.sender) : (socket.deviceName || 'Unknown');
+
             const messageData = {
                 id: Date.now(),
                 text: sanitizedText,
-                sender: socket.deviceName,
+                sender: senderName,
+                senderId: socket.id, // Add sender ID for location tracking
                 timestamp: Date.now(),
                 room: room
             };
@@ -209,6 +215,20 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             socket.to(room).emit('user-disconnected', {
                 peerId: socket.id,
                 userName: socket.deviceName
+            });
+        });
+
+        // Handle "Request All to Join"
+        socket.on('request-join-call', () => {
+            const room = socket.room || 'public';
+            const senderName = socket.deviceName || 'A user';
+            console.log(`📞 ${senderName} is requesting everyone to join call in ${room}`);
+
+            // Broadcast to everyone in room (including sender is fine, but usually exclude sender)
+            // Using socket.to(room) excludes sender
+            socket.to(room).emit('request-join-call', {
+                senderId: socket.id,
+                senderName: senderName
             });
         });
 

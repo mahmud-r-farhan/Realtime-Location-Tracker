@@ -1,6 +1,8 @@
 import { addNotification } from './notification.js';
 import { socket } from './socket.js';
 import { getDeviceName } from './device.js';
+import { playNotificationBeep } from './sounds.js';
+import { focusMapOnDevice, markers } from './map.js';
 
 let unreadMessages = 0;
 let currentUserName = '';
@@ -28,6 +30,28 @@ export function addMessageToChat(messageData, isSent) {
     messageContent.appendChild(messageInfo);
     messageContent.appendChild(timeStamp);
     messageElement.appendChild(messageContent);
+
+    // Add click listener to focus on sender location
+    if (!isSent && messageData.senderId) {
+        messageElement.style.cursor = 'pointer';
+        messageElement.title = 'Click to view sender location';
+        messageElement.addEventListener('click', () => {
+            const marker = markers[messageData.senderId];
+            if (marker) {
+                const latLng = marker.getLatLng();
+                focusMapOnDevice(latLng.lat, latLng.lng, 18); // Zoom nicely
+                marker.openPopup();
+
+                // On mobile, close chat to show map
+                if (window.innerWidth <= 768) {
+                    document.getElementById('chat-panel').classList.add('hidden');
+                }
+            } else {
+                addNotification('🚫 Sender location not available');
+            }
+        });
+    }
+
     const chatMessages = document.getElementById('chat-messages');
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -35,6 +59,10 @@ export function addMessageToChat(messageData, isSent) {
         unreadMessages++;
         updateChatNotification();
         addNotification(`New message from ${sender}`);
+    }
+    // Play sound for all incoming messages, even if panel is open (user feedback)
+    if (!isSent) {
+        playNotificationBeep();
     }
 }
 
@@ -52,11 +80,16 @@ export function initChat() {
     setCurrentChatUser(localStorage.getItem('userName') || getDeviceName());
     document.getElementById('chat-fab').addEventListener('click', () => {
         const chatPanel = document.getElementById('chat-panel');
-        chatPanel.classList.toggle('hidden');
-        if (!chatPanel.classList.contains('hidden')) {
+        // If hidden, we are opening it
+        if (chatPanel.classList.contains('hidden')) {
+            chatPanel.classList.remove('hidden');
             unreadMessages = 0;
             updateChatNotification();
-            document.getElementById('message-input').focus();
+            // Minor delay to ensure visibility before focus
+            setTimeout(() => document.getElementById('message-input').focus(), 50);
+        } else {
+            // Closing it
+            chatPanel.classList.add('hidden');
         }
     });
     document.getElementById('close-chat').addEventListener('click', () => {
@@ -74,9 +107,10 @@ export function initChat() {
         const messageText = document.getElementById('message-input').value.trim();
         if (!messageText) return;
         document.getElementById('message-input').value = '';
+        const currentName = localStorage.getItem('userName') || currentUserName || 'Unknown';
         const messageData = {
             text: messageText,
-            sender: currentUserName,
+            sender: currentName,
             timestamp: Date.now()
         };
         addMessageToChat(messageData, true);

@@ -7,6 +7,9 @@ import { initAudioControls } from './audio.js';
 import { initChat, setCurrentChatUser } from './chat.js';
 import { initSOS } from './sos.js';
 import { LOCATION_SEND_INTERVAL, LOCATION_IDLE_INTERVAL } from './config.js';
+import { initTheme } from './theme.js';
+import { initControls } from './controls.js';
+import { initBatteryMonitor } from './batteryMonitor.js';
 
 // Expose focusMapOnDevice globally for SOS
 window.focusMapOnLocation = focusMapOnDevice;
@@ -89,8 +92,38 @@ async function sendLocationData() {
     } catch (error) {
         console.error('Error getting location:', error);
         // Only notify specific errors to avoid spamming
-        if (error.code === 1) addNotification('Location access denied.');
+        if (error.code === 1) {
+            addNotification('Location access denied.');
+            showPermissionDeniedAlert('location');
+        }
     }
+}
+
+function showPermissionDeniedAlert(type) {
+    if (document.getElementById(`permission-alert-${type}`)) return;
+
+    const modal = document.createElement('div');
+    modal.id = `permission-alert-${type}`;
+    modal.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.8);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    modal.innerHTML = `
+        <div style="background: white; padding: 30px; border-radius: 12px; max-width: 400px; text-align: center;">
+            <div style="font-size: 40px; margin-bottom: 20px;">⚠️</div>
+            <h2>${type === 'location' ? 'Location' : 'Microphone'} Access Denied</h2>
+            <p style="margin: 15px 0;">We cannot ${type === 'location' ? 'track your location' : 'process audio'} because permission was denied.</p>
+            <p style="color: #666; font-size: 14px;">Please enable permissions in your browser settings (look for the lock icon in the address bar) and reload the page.</p>
+            <button class="retry-btn" style="margin-top: 20px; padding: 10px 20px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer;">I Understand</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelector('.retry-btn').addEventListener('click', () => modal.remove());
 }
 
 function startLocationUpdates(interval) {
@@ -100,12 +133,20 @@ function startLocationUpdates(interval) {
 }
 
 function initializeApp() {
+    // Initialize theme system first (applies CSS variables)
+    initTheme();
+
+    // Core modules
     initMap();
     initSidebar();
     initAudioControls();
     initChat();
     initNotificationPanel();
     initSOS();
+
+    // New feature modules
+    initControls();
+    initBatteryMonitor();
 
     // Join Room
     emitJoinRoom(orgName, userName || deviceName);
@@ -115,7 +156,7 @@ function initializeApp() {
         // Start updates after joining room
         startLocationUpdates(LOCATION_SEND_INTERVAL);
         initMotionDetection();
-        addNotification('Location sharing enabled.');
+        addNotification('📍 Location sharing enabled');
     });
 }
 

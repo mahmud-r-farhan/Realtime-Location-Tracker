@@ -5,30 +5,80 @@
 }
 
 :root {
-  --primary-color: #007bff;
-  --primary-dark: #0056b3;
-  --secondary-color: #2c3e50;
-  --accent-color: #e74c3c;
-  --success-color: #28a745;
-  --warning-color: #ffc107;
+  /* Primary Colors */
+  --primary-color: #0066FF;
+  --primary-dark: #0052CC;
+  --primary-light: #3385FF;
+  --secondary-color: #1e293b;
+
+  /* Accent & Status Colors */
+  --accent-color: #00E5FF;
+  --accent-hover: #00B8D4;
+  --success-color: #00C853;
+  --warning-color: #FFAB00;
+  --danger-color: #FF3D00;
+  --info-color: #2979FF;
+
+  /* Background Colors - Light Theme Defaults */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
   --background: #f8f9fa;
   --surface: #ffffff;
   --surface-alt: #f1f3f4;
-  --text-primary: #2c3e50;
-  --text-secondary: #6c757d;
-  --text-muted: #868e96;
+
+  /* Card & Panel Backgrounds */
+  --card-bg: #ffffff;
+  --panel-bg: rgba(255, 255, 255, 0.98);
+  --sidebar-bg: rgba(255, 255, 255, 0.95);
+  --notification-bg: rgba(255, 255, 255, 0.95);
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+
+  /* Text Colors */
+  --text-primary: #212529;
+  --text-secondary: #495057;
+  --text-muted: #6c757d;
+
+  /* Border & Shadow */
   --border-color: #dee2e6;
+  --shadow-color: rgba(0, 0, 0, 0.1);
   --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.15);
   --shadow-heavy: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  /* Input Styles */
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
+  --input-focus: #4f46e5;
+
+  /* Gradients */
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --gradient-accent: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --fab-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-start: #667eea;
+  --gradient-end: #764ba2;
+
+  /* Border Radius */
   --border-radius: 12px;
   --border-radius-sm: 6px;
   --border-radius-lg: 20px;
+  --border-radius-full: 9999px;
+
+  /* Transitions */
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-medium: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-Index Scale */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
 }
 
 html,
