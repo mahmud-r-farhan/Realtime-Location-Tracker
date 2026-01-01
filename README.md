@@ -55,7 +55,16 @@ The application provides a responsive design for a consistent user experience ac
 
 ## Version Release
 
-### **Version 4.0 (Latest)** – **SOS Emergency & PWA Support**
+### **Version 4.1 (Current)** – **Organization Rooms & Optimization**
+
+- **🏢 Organization/Fleet Rooms:** Users can now join specific "Organization IDs" to create private fleets. Only users in the same organization can see each other and chat.
+- **🔋 Battery Saver Protocol:** Intelligent motion detection slows down GPS updates when the device is stationary, significantly extending battery life.
+- **🗺️ Map Customization:** New Layer Control allows switching between OpenStreetMap, OpenTopoMap, Satellite (Esri), and Dark Mode.
+- **⚡ Bandwidth Optimization:** Room isolation prevents the $N^2$ scaling issue by limiting data broadcasts to room members only.
+
+---
+
+### **Version 4.0** – **SOS Emergency & PWA Support**
 
 - **🆘 SOS Emergency System:** One-touch emergency alerts with comprehensive device and location data
 - **📱 PWA Support:** Full Progressive Web App with offline capabilities
@@ -64,7 +73,6 @@ The application provides a responsive design for a consistent user experience ac
 - **📍 IP Geolocation:** Additional location data from IP address
 - **🎨 Modern UI:** Beautiful, responsive modal for SOS management
 
-> Recommended Version: 4.0.0
 
 ---
 
@@ -109,7 +117,8 @@ realtime-location-tracker/
 │   │   ├── notification.css
 │   │   ├── popup.css
 │   │   ├── responsive.css
-│   │   └── icon.css
+│   │   ├── icon.css
+│   │   ├── sos.css
 │   ├── js/
 │   │   ├── main.js             # Main app orchestrator
 │   │   ├── config.js           # Configuration constants
@@ -203,11 +212,12 @@ http://localhost:3007
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
+| `join-room` | Client → Server | Join a specific Organization/Fleet |
 | `send-location` | Client → Server | Send device location |
-| `receive-location` | Server → Client | Receive location updates |
-| `sos-alert` | Bidirectional | Emergency SOS broadcast |
-| `chat-message` | Bidirectional | Chat messages |
-| `join-audio` | Client → Server | Join audio channel |
+| `receive-location` | Server → Client | Receive location updates (Room Scoped) |
+| `sos-alert` | Bidirectional | Emergency SOS broadcast (Room Scoped) |
+| `chat-message` | Bidirectional | Chat messages (Room Scoped) |
+| `join-audio` | Client → Server | Join audio channel (Room Scoped) |
 | `user-connected` | Server → Client | New user notification |
 | `user-disconnect` | Server → Client | User left notification |
 
@@ -264,7 +274,7 @@ docker-compose up -d
 A: Depends on device hardware (typically ±5-50 meters).
 
 **Q: Can I use custom map providers?**
-A: Yes! Replace the tile layer URL in `map.js` with Mapbox/Google Maps.
+A: Yes! Use the new Layer Control to switch between default maps, or edit `map.js` to add more.
 
 **Q: Is the SOS feature secure?**
 A: SOS alerts are broadcast to all connected users only. Data is sanitized server-side.

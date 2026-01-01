@@ -6,9 +6,32 @@ export const markers = {};
 
 export function initMap(mapId = 'map') {
     map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://gravatar.com/floawd">Mahmud'
+
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
     }).addTo(map);
+
+    const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenTopoMap'
+    });
+
+    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri'
+    });
+
+    const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    });
+
+    const baseMaps = {
+        "OpenStreetMap": osm,
+        "OpenTopoMap": topo,
+        "Satellite": satellite,
+        "Dark Mode": dark
+    };
+
+    L.control.layers(baseMaps).addTo(map);
+
     return map;
 }
 

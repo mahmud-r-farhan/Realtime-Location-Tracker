@@ -19,7 +19,7 @@ export const socket = io({
     reconnectionDelay: 3000
 });
 
-export function initSocketEventHandlers() {
+export function initSocketEventHandlers(onJoinSuccess) {
     socket.on('connect', () => {
         addNotification('Connected to server');
     });
@@ -30,6 +30,11 @@ export function initSocketEventHandlers() {
 
     socket.on('reconnect', (attemptNumber) => {
         addNotification(`Reconnected to server after ${attemptNumber} attempts`);
+    });
+
+    socket.on('joined-room', (data) => {
+        addNotification(`Joined organization/fleet: ${data.room}`);
+        if (onJoinSuccess) onJoinSuccess();
     });
 
     socket.on('receive-location', (data) => {
@@ -98,6 +103,10 @@ export function initSocketEventHandlers() {
             addMessageToChat(data, false);
         }
     });
+}
+
+export function emitJoinRoom(room, deviceName) {
+    socket.emit('join-room', { room, deviceName });
 }
 
 export function emitSendLocation(locationData) {

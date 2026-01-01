@@ -1,4 +1,4 @@
-import { focusMapOnDevice, openDevicePopup, showDeviceInfo, markers } from './map.js'; 
+import { focusMapOnDevice, openDevicePopup, showDeviceInfo, markers } from './map.js';
 import { emitRequestDeviceLocation } from './socket.js';
 import { getDeviceIcon } from './device.js';
 
@@ -12,6 +12,10 @@ export function hideNamePopup() {
 
 export function getUserNameInput() {
     return document.getElementById('user-name-input').value.trim();
+}
+
+export function getOrgInput() {
+    return document.getElementById('org-input').value.trim();
 }
 
 export function updateDeviceList(devices, currentSocketId) {

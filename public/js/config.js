@@ -21,5 +21,6 @@ export const WEBRTC_CONFIGURATION = {
 export const INITIAL_MAP_VIEW = [0, 0];
 export const INITIAL_MAP_ZOOM = 3;
 export const LOCATION_SEND_INTERVAL = 2000; // ms
+export const LOCATION_IDLE_INTERVAL = 30000; // 30s when stationary
 export const MAX_NOTIFICATIONS = 50;
 export const NOTIFICATION_ACTIVE_TIMEOUT = 5000; // ms
