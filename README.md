@@ -12,6 +12,8 @@ The application provides a responsive design for a consistent user experience ac
 
 ---
 
+[![download-ezgif-com-video-to-gif-converter.gif](https://i.postimg.cc/8P8K6kjc/download-ezgif-com-video-to-gif-converter.gif)](https://postimg.cc/8sHm8Sdg)
+
 ## 🚀 Features
 
 ### Core Features
