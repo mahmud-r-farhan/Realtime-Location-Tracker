@@ -1,5 +1,8 @@
 #device-list {
     list-style-type: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 #device-list li {
@@ -15,62 +18,68 @@
 }
 
 #device-list li:hover {
-    background-color: #f5f5f5;
-}
-
-.Connected-Devices {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+    background: var(--bg-primary);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-medium);
 }
 
 .device-icon {
-    width: 24px;
-    height: 24px;
-    margin-right: 10px;
+    width: 28px;
+    height: 28px;
+    margin-right: 14px;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
 .device-name {
-    font-size: 0.9em;
-    color: #333;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: black;
     flex-grow: 1;
 }
 
+.device-name:hover {
+color: white;
+}
+
+
 .device-info {
-    color: #007bff;
+    color: var(--primary-color);
+    opacity: 0.6;
     cursor: pointer;
     margin-left: 10px;
+    transition: opacity var(--transition-fast);
 }
 
 .device-info:hover {
-    color: #0056b3;
+    opacity: 1;
 }
 
 .device-info-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
 .device-info-item {
-    background: #f8f9fa;
-    padding: 8px;
-    border-radius: 4px;
-    font-size: 13px;
+    background: var(--bg-tertiary);
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
 }
 
 .device-info-label {
-    color: #666;
-    font-size: 11px;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     margin-bottom: 4px;
 }
 
 .device-info-value {
-    color: #2c3e50;
-    font-weight: 500;
+    color: var(--text-primary);
+    font-weight: 600;
 }

@@ -19,32 +19,36 @@
   --danger-color: #FF3D00;
   --info-color: #2979FF;
 
-  /* Background Colors - Light Theme Defaults */
+  /* Background Colors - Modern Glassmorphism */
   --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --background: #f8f9fa;
-  --surface: #ffffff;
-  --surface-alt: #f1f3f4;
+  --bg-secondary: #fdfdfd;
+  --bg-tertiary: #f1f3f4;
+  --background: #f0f2f5;
+  --surface: rgba(255, 255, 255, 0.85);
+  --surface-alt: rgba(241, 243, 244, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-blur: blur(12px);
 
   /* Card & Panel Backgrounds */
-  --card-bg: #ffffff;
-  --panel-bg: rgba(255, 255, 255, 0.98);
-  --sidebar-bg: rgba(255, 255, 255, 0.95);
-  --notification-bg: rgba(255, 255, 255, 0.95);
-  --overlay-bg: rgba(0, 0, 0, 0.5);
+  --card-bg: var(--surface);
+  --panel-bg: var(--glass-bg);
+  --sidebar-bg: var(--glass-bg);
+  --notification-bg: var(--glass-bg);
+  --overlay-bg: rgba(0, 0, 0, 0.4);
 
   /* Text Colors */
   --text-primary: #212529;
   --text-secondary: #495057;
   --text-muted: #6c757d;
 
-  /* Border & Shadow */
-  --border-color: #dee2e6;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --shadow-light: 0 2px 4px rgba(0, 0, 0, 0.1);
-  --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.15);
-  --shadow-heavy: 0 8px 32px rgba(0, 0, 0, 0.2);
+  /* Border & Shadow - Refined */
+  --border-color: rgba(0, 0, 0, 0.08);
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --shadow-light: 0 4px 6px -1px var(--shadow-color), 0 2px 4px -1px var(--shadow-color);
+  --shadow-medium: 0 10px 15px -3px var(--shadow-color), 0 4px 6px -2px var(--shadow-color);
+  --shadow-heavy: 0 20px 25px -5px var(--shadow-color), 0 10px 10px -5px var(--shadow-color);
+  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
 
   /* Input Styles */
   --input-bg: #ffffff;

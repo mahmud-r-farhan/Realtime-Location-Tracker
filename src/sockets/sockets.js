@@ -61,10 +61,21 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
         });
 
         socket.on('send-location', (data) => {
-            if (!data || !data.latitude || !data.longitude || !data.deviceName) {
-                console.warn(`Invalid location data from ${socket.id}`);
+            if (!data || data.latitude === undefined || data.longitude === undefined || !data.deviceName) {
+                console.warn(`Invalid location data structure from ${socket.id}`);
                 return;
             }
+
+            // Rigorous coordinate validation
+            const lat = parseFloat(data.latitude);
+            const lng = parseFloat(data.longitude);
+            const acc = parseFloat(data.accuracy) || 0;
+
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                console.warn(`Out of range coordinates from ${socket.id}: ${lat}, ${lng}`);
+                return;
+            }
+
             // Ensure socket is in a room. If send-location comes before join-room, default to public
             if (!socket.room) {
                 socket.join('public');
@@ -74,13 +85,14 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const sanitizedDeviceName = sanitizeHtml(data.deviceName, {
                 allowedTags: [],
                 allowedAttributes: {}
-            });
+            }).substring(0, 50); // Limit length
+
             const deviceData = {
-                latitude: data.latitude,
-                longitude: data.longitude,
+                latitude: lat,
+                longitude: lng,
                 deviceName: sanitizedDeviceName,
-                accuracy: data.accuracy,
-                deviceInfo: data.deviceInfo || {},
+                accuracy: Math.min(acc, 10000), // Sanity cap for accuracy
+                deviceInfo: typeof data.deviceInfo === 'object' ? data.deviceInfo : {},
                 ip: socket.clientIP, // Add IP address
                 joinedAt: new Date(),
                 room: socket.room // Store room

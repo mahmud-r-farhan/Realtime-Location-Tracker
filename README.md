@@ -66,12 +66,13 @@ realtime-location-tracker/
 │   │   ├── ios-log.png
 │   │   ├── windows-log.png
 │   │   ├── mac-log.png
+│   │   ├── linux-log.svg       # New Linux support
 │   │   ├── unknown-log.png
 │   │   ├── microphone-*.png
 │   │   ├── speaker-*.png
 │   │   └── favico.png
 │   ├── css/
-│   │   ├── style.css
+│   │   ├── style.css           # Modernized Glassmorphism
 │   │   ├── panel.css
 │   │   ├── device.css
 │   │   ├── chat.css
@@ -92,13 +93,18 @@ realtime-location-tracker/
 │   │   ├── chat.js             # Chat functionality
 │   │   ├── audio.js            # WebRTC audio
 │   │   ├── sos.js              # 🆘 SOS emergency module
+│   │   ├── profile.js          # New Profile Management
+│   │   ├── controls.js         # New Map Controls
 │   │   └── pwa.js              # PWA management
 │   ├── manifest.json           # PWA manifest
 │   ├── sw.js                   # Service Worker
 │   └── offline.html            # Offline fallback page
-├── views/
-│   └── index.ejs               # Main view template
-├── app.js                      # Express server
+├── src/                        # New Server-side Source Directory
+│   ├── middleware/             # Security (Helmet, Rate Limit)
+│   ├── routes/
+│   ├── sockets/                # Enhanced validation
+│   ├── views/                  # EJS templates
+│   └── app.js                  # Entry point
 ├── package.json
 ├── dockerfile
 └── README.md

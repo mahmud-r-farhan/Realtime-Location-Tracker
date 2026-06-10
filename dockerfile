@@ -19,7 +19,7 @@ FROM node:20-alpine AS production
 # Labels
 LABEL maintainer="Mahmud R. Farhan"
 LABEL description="Real-Time Location Tracker with WebRTC Audio Support"
-LABEL version="4.0.0"
+LABEL version="4.2.0"
 
 # Set working directory
 WORKDIR /app
@@ -49,4 +49,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 USER nodejs
 
 # Start the application
-CMD ["node", "app.js"]
+CMD ["node", "src/app.js"]

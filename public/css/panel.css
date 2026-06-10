@@ -4,10 +4,13 @@
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--primary-color) transparent;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 #info-panel::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 #info-panel::-webkit-scrollbar-track {
@@ -15,8 +18,8 @@
 }
 
 #info-panel::-webkit-scrollbar-thumb {
-  background: var(--primary-color);
-  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.473);
+  border-radius: 10px;
 }
 
 .Connected-Devices {
@@ -24,23 +27,30 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  padding: 18px 20px;
-  background: var(--gradient-primary);
+  padding: 20px;
+  background: var(--primary-color);
+  border: 1px solid var(--glass-border);
   border-radius: var(--border-radius);
-  color: white;
-  box-shadow: var(--shadow-medium);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-glass);
 }
 
 .Connected-Devices h2 {
   font-size: 1.2em;
   font-weight: 600;
+  color: white;
 }
 
 #user-count {
-  font-size: 1.9em;
+  font-size: 1.5rem;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.233);
-  padding: 10px 16px;
-  border-radius: var(--border-radius-lg);
-  text-align: center;
+  background: var(--primary-color);
+  color: white;
+  min-width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 102, 255, 0.39);
 }

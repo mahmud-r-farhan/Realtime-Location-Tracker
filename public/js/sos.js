@@ -114,7 +114,7 @@ async function triggerSOS() {
                 screenSize: `${screen.width}x${screen.height}`,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
             },
-
+            ipInfo: { ip: 'Fetching...' }, // Placeholder for local trigger
             timestamp: Date.now(),
             message: 'Emergency SOS Alert!'
         };
@@ -260,8 +260,11 @@ function closeSOSModal() {
 
 
 async function addSOSToList(sosData) {
+    // Ensure ipInfo exists
+    if (!sosData.ipInfo) sosData.ipInfo = { ip: 'Unknown' };
+
     // Fetch IP geolocation if not already present
-    if (!sosData.ipInfo.city && sosData.ipInfo.ip && sosData.ipInfo.ip !== 'Unknown') {
+    if (!sosData.ipInfo.city && sosData.ipInfo.ip && sosData.ipInfo.ip !== 'Unknown' && sosData.ipInfo.ip !== 'Fetching...') {
         try {
             const geoData = await fetchIPGeolocation(sosData.ipInfo.ip);
             sosData.ipInfo = { ...sosData.ipInfo, ...geoData };

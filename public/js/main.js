@@ -10,18 +10,25 @@ import { LOCATION_SEND_INTERVAL, LOCATION_IDLE_INTERVAL } from './config.js';
 import { initTheme } from './theme.js';
 import { initControls } from './controls.js';
 import { initBatteryMonitor } from './batteryMonitor.js';
+import { getUserName, getOrgName, updateProfile, initProfile } from './profile.js';
 
 // Expose focusMapOnDevice globally for SOS
 window.focusMapOnLocation = focusMapOnDevice;
-
-let userName = localStorage.getItem('userName') || '';
-let orgName = localStorage.getItem('orgName') || 'public';
 
 const deviceName = getDeviceName();
 let locationSendIntervalId = null;
 let lastAcceleration = { x: 0, y: 0, z: 0 };
 let stationaryCounter = 0;
-let isstationary = false;
+let isStationary = false;
+
+// Listen for profile updates
+window.addEventListener('profileUpdate', (e) => {
+    const { userName, orgName } = e.detail;
+    setCurrentChatUser(userName || deviceName);
+    // Optionally rejoin room if org changed
+    emitJoinRoom(orgName, userName || deviceName);
+    addNotification('🔄 Profile updated synced');
+});
 
 // Battery Optimization: Accelerometer logic
 function initMotionDetection() {
@@ -43,18 +50,18 @@ function initMotionDetection() {
                 stationaryCounter++;
             } else {
                 stationaryCounter = 0;
-                if (isstationary) {
+                if (isStationary) {
                     console.log("Motion detected! Increasing update frequency.");
-                    isstationary = false;
+                    isStationary = false;
                     startLocationUpdates(LOCATION_SEND_INTERVAL);
                 }
             }
 
             // If stationary for ~10 seconds (~60 events at 60ms default interval roughly, usually events fire frequently)
             // Let's rely on time check implicitly by counter size or just check periodically
-            if (stationaryCounter > 100 && !isstationary) { // Arbitrary number of events
+            if (stationaryCounter > 100 && !isStationary) { // Arbitrary number of events
                 console.log("Device stationary. Reducing update frequency.");
-                isstationary = true;
+                isStationary = true;
                 startLocationUpdates(LOCATION_IDLE_INTERVAL);
             }
         });
@@ -65,6 +72,8 @@ function initMotionDetection() {
 }
 
 
+let lastLocation = { latitude: 0, longitude: 0 };
+
 async function sendLocationData() {
     if (!('geolocation' in navigator)) {
         addNotification('Geolocation is not available.');
@@ -73,14 +82,23 @@ async function sendLocationData() {
     try {
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: !isstationary, // Disable high accuracy if stationary to save battery
+                enableHighAccuracy: !isStationary, // Disable high accuracy if stationary to save battery
                 timeout: 5000,
                 maximumAge: 0
             });
         });
-        const deviceInfo = await getDeviceInfo();
+
         const { latitude, longitude, accuracy } = position.coords;
-        const displayName = userName || deviceName;
+
+        // Optimization: Don't send if location hasn't changed significantly
+        if (latitude === lastLocation.latitude && longitude === lastLocation.longitude) {
+            return;
+        }
+
+        lastLocation = { latitude, longitude };
+        
+        const deviceInfo = await getDeviceInfo();
+        const displayName = getUserName() || deviceName;
 
         emitSendLocation({
             latitude,
@@ -149,7 +167,7 @@ function initializeApp() {
     initBatteryMonitor();
 
     // Join Room
-    emitJoinRoom(orgName, userName || deviceName);
+    emitJoinRoom(getOrgName(), getUserName() || deviceName);
 
     // Socket handlers with callback for when joined
     initSocketEventHandlers(() => {
@@ -161,30 +179,25 @@ function initializeApp() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (!userName && !localStorage.getItem('userNameSkipped')) {
+    const uName = getUserName();
+    if (!uName && !localStorage.getItem('userNameSkipped')) {
         showNamePopup();
         setupContinueButton(() => {
             const inputName = getUserNameInput();
             const inputOrg = getOrgInput();
 
-            if (inputName) {
-                userName = inputName;
-                localStorage.setItem('userName', userName);
+            if (inputName || inputOrg) {
+                updateProfile(inputName, inputOrg);
             } else {
                 localStorage.setItem('userNameSkipped', 'true');
             }
 
-            if (inputOrg) {
-                orgName = inputOrg;
-                localStorage.setItem('orgName', orgName);
-            }
-
-            setCurrentChatUser(userName || deviceName);
+            setCurrentChatUser(getUserName() || deviceName);
             hideNamePopup();
             initializeApp();
         });
     } else {
-        setCurrentChatUser(userName || deviceName);
+        setCurrentChatUser(uName || deviceName);
         initializeApp();
     }
 });

@@ -1,11 +1,11 @@
 {
   "name": "realtime_tracker",
-  "version": "4.2.0",
+  "version": "5.0.0",
   "description": "Real-Time Location Tracker with SOS Emergency alerts, PWA support, WebRTC audio, and live chat",
-  "main": "app.js",
+  "main": "src/app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +16,7 @@
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-rate-limit": "^7.5.0",
+    "helmet": "^8.2.0",
     "http": "^0.0.1-security",
     "leaflet": "^1.9.4",
     "path": "^0.12.7",

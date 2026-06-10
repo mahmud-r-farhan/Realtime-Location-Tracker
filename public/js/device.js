@@ -60,7 +60,7 @@ export function getDeviceIcon(deviceName) {
     if (deviceName.includes('Android')) return 'Android Device';
     if (deviceName.includes('iOS')) return 'iOS Device';
     if (deviceName.includes('Windows')) return 'Windows PC';
-    if (deviceName.includes('Linux')) return 'Windows PC'; // Map Linux to Computer icon
+    if (deviceName.includes('Linux')) return 'Linux PC';
     if (deviceName.includes('Mac')) return 'Mac';
     return 'Unknown Device';
 }

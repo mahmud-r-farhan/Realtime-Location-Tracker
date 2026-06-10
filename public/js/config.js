@@ -3,6 +3,7 @@ export const LEAFLET_ICONS = {
     "iOS Device": L.icon({ iconUrl: '../assets/ios-log.png', iconSize: [32, 41], iconAnchor: [12, 32] }),
     "Windows PC": L.icon({ iconUrl: '../assets/windows-log.gif', iconSize: [25, 25], iconAnchor: [12, 25] }),
     "Mac": L.icon({ iconUrl: '../assets/mac-log.png', iconSize: [25, 41], iconAnchor: [12, 41] }),
+    "Linux PC": L.icon({ iconUrl: '../assets/linux-log.png', iconSize: [25, 25], iconAnchor: [12, 25] }),
     "Unknown Device": L.icon({ iconUrl: '../assets/unknown-log.svg', iconSize: [25, 25], iconAnchor: [12, 25] })
 };
 

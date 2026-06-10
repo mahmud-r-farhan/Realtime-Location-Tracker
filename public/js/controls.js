@@ -8,6 +8,7 @@ import { map } from './map.js';
 import { toggleTheme, getCurrentTheme } from './theme.js';
 import { addNotification } from './notification.js';
 import { showNamePopup } from './ui.js';
+import { getUserName, getOrgName, updateProfile } from './profile.js';
 
 // State
 let fabOpen = false;
@@ -270,22 +271,12 @@ function attachEventListeners() {
                 const newName = nameInput.value.trim();
                 const newOrg = orgInput.value.trim();
 
-                if (newName) {
-                    localStorage.setItem('userName', newName);
-                    // Update variable if we could access main.js scope, but we can't easily.
-                    // Reloading page is a safe bet for full update, or just update UI where possible.
-                    // For now, let's just save and notify.
+                if (newName || newOrg) {
+                    updateProfile(newName, newOrg);
+                    addNotification('✅ Profile updated!');
                 }
-                if (newOrg) {
-                    localStorage.setItem('orgName', newOrg);
-                }
-
-                addNotification('✅ Profile updated! Reloading...');
+                
                 document.getElementById('name-popup').classList.add('hidden');
-
-                // Reload to apply changes cleanly across all sockets/modules
-                setTimeout(() => window.location.reload(), 1000);
-
                 continueBtn.removeEventListener('click', handleSave);
             };
 
