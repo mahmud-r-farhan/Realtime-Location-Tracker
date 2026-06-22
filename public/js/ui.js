@@ -65,3 +65,30 @@ export function initSidebar() {
 export function setupContinueButton(callback) {
     document.getElementById('continue-btn').addEventListener('click', callback);
 }
+
+export function initInviteLink() {
+    const copyBtn = document.getElementById('copy-invite-btn');
+    if (!copyBtn) return;
+
+    copyBtn.addEventListener('click', async () => {
+        const org = localStorage.getItem('orgName') || 'public';
+        const url = new URL(window.location.href);
+        url.searchParams.set('room', org);
+
+        try {
+            await navigator.clipboard.writeText(url.toString());
+            const originalText = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            copyBtn.style.borderColor = 'var(--success-color)';
+            copyBtn.style.color = 'var(--success-color)';
+
+            setTimeout(() => {
+                copyBtn.innerHTML = originalText;
+                copyBtn.style.borderColor = 'var(--primary-color)';
+                copyBtn.style.color = 'var(--primary-color)';
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+        }
+    });
+}

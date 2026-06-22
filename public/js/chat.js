@@ -22,13 +22,21 @@ export function addMessageToChat(messageData, isSent) {
     messageText.textContent = text;
     const messageInfo = document.createElement('div');
     messageInfo.classList.add('message-info');
-    messageInfo.textContent = isSent ? 'You' : sender;
+
+    const senderSpan = document.createElement('span');
+    senderSpan.classList.add('message-sender');
+    senderSpan.textContent = isSent ? 'You' : sender;
+
     const timeStamp = document.createElement('span');
     timeStamp.classList.add('message-time');
     timeStamp.textContent = new Date(timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    messageInfo.appendChild(senderSpan);
+    messageInfo.appendChild(document.createTextNode(' • '));
+    messageInfo.appendChild(timeStamp);
+
     messageContent.appendChild(messageText);
     messageContent.appendChild(messageInfo);
-    messageContent.appendChild(timeStamp);
     messageElement.appendChild(messageContent);
 
     // Add click listener to focus on sender location

@@ -1,6 +1,6 @@
 import { initMap, focusMapOnDevice } from './map.js';
 import { getDeviceName, getDeviceInfo } from './device.js';
-import { showNamePopup, hideNamePopup, getUserNameInput, getOrgInput, initSidebar, setupContinueButton } from './ui.js';
+import { showNamePopup, hideNamePopup, getUserNameInput, getOrgInput, initSidebar, setupContinueButton, initInviteLink } from './ui.js';
 import { initNotificationPanel, addNotification } from './notification.js';
 import { initSocketEventHandlers, emitSendLocation, emitJoinRoom } from './socket.js';
 import { initAudioControls } from './audio.js';
@@ -14,6 +14,21 @@ import { getUserName, getOrgName, updateProfile, initProfile } from './profile.j
 
 // Expose focusMapOnDevice globally for SOS
 window.focusMapOnLocation = focusMapOnDevice;
+
+// Debug exposure
+import { socket } from './socket.js';
+import { map, markers, updateMarker, toggleFollowMe, setSelfId } from './map.js';
+
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    window.__DEBUG__ = {
+        socket,
+        map,
+        markers,
+        updateMarker,
+        toggleFollowMe,
+        setSelfId
+    };
+}
 
 const deviceName = getDeviceName();
 let locationSendIntervalId = null;
@@ -165,6 +180,7 @@ function initializeApp() {
     // New feature modules
     initControls();
     initBatteryMonitor();
+    initInviteLink();
 
     // Join Room
     emitJoinRoom(getOrgName(), getUserName() || deviceName);
@@ -179,6 +195,13 @@ function initializeApp() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Handle room join from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = urlParams.get('room');
+    if (roomParam) {
+        localStorage.setItem('orgName', roomParam);
+    }
+
     const uName = getUserName();
     if (!uName && !localStorage.getItem('userNameSkipped')) {
         showNamePopup();

@@ -15,8 +15,10 @@ module.exports = function setupMiddleware(app) {
         contentSecurityPolicy: {
             directives: {
                 ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-                "script-src": ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://kit.fontawesome.com"],
-                "img-src": ["'self'", "data:", "https://*.tile.openstreetmap.org", "https://*.tile.thunderforest.com", "https://*.basemaps.cartocdn.com", "https://gravatar.com"],
+                "script-src": ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://kit.fontawesome.com", "https://cdnjs.cloudflare.com"],
+                "style-src": ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com"],
+                "img-src": ["'self'", "data:", "https://*.tile.openstreetmap.org", "https://*.tile.thunderforest.com", "https://*.basemaps.cartocdn.com", "https://gravatar.com", "https://server.arcgisonline.com"],
+                "font-src": ["'self'", "https://cdnjs.cloudflare.com", "https://fonts.gstatic.com", "https://ka-f.fontawesome.com"],
                 "connect-src": ["'self'", "https://ipapi.co", "https://ka-f.fontawesome.com"],
             },
         },

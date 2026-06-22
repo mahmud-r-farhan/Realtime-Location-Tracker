@@ -53,6 +53,26 @@
     animation: sosFlash 0.3s ease infinite;
 }
 
+#sos-overlay {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle, transparent 50%, rgba(220, 38, 38, 0.4) 100%);
+    z-index: 9998;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+#sos-overlay.active {
+    opacity: 1;
+    animation: sosOverlayPulse 1s ease infinite;
+}
+
+@keyframes sosOverlayPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.6; }
+}
+
 @keyframes sosPulse {
 
     0%,

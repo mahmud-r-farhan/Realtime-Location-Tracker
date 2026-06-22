@@ -1,4 +1,4 @@
-import { updateMarker, removeMarker, focusMapOnDevice, markers } from './map.js';
+import { updateMarker, removeMarker, focusMapOnDevice, markers, setSelfId } from './map.js';
 import { updateDeviceList, updateUserCount } from './ui.js';
 import { addNotification } from './notification.js';
 import { addMessageToChat } from './chat.js';
@@ -22,6 +22,7 @@ export const socket = io({
 export function initSocketEventHandlers(onJoinSuccess) {
     socket.on('connect', () => {
         addNotification('Connected to server');
+        setSelfId(socket.id);
     });
 
     socket.on('disconnect', () => {
