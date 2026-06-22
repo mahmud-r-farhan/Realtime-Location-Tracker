@@ -54,3 +54,37 @@
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 102, 255, 0.39);
 }
+
+.room-actions {
+  padding: 15px 0;
+  border-top: 1px solid var(--border-color);
+  margin-top: 10px;
+}
+
+.copy-invite-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--border-radius);
+  border: 2px solid var(--primary-color);
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all var(--transition-fast);
+}
+
+.copy-invite-btn:hover {
+  background: var(--primary-color);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-medium);
+}
+
+.copy-invite-btn:active {
+  transform: translateY(0);
+}

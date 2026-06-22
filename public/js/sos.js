@@ -465,6 +465,13 @@ function initSOSSocketHandlers() {
         // Add to list
         addSOSToList({ ...data, isOwn: false });
 
+        // Activate overlay
+        const overlay = document.getElementById('sos-overlay');
+        if (overlay) {
+            overlay.classList.add('active');
+            setTimeout(() => overlay.classList.remove('active'), 10000); // 10s overlay
+        }
+
         // Show notification
         addNotification(`🚨 SOS from ${data.sender}!`);
 

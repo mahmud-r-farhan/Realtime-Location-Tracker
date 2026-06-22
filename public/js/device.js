@@ -1,10 +1,18 @@
 export function getDeviceName() {
     const userAgent = navigator.userAgent;
+    const platform = navigator.platform.toLowerCase();
+
     if (/android/i.test(userAgent)) return 'Android Device';
     if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) return 'iOS Device';
+    if (/win/i.test(platform)) return 'Windows PC';
+    if (/mac/i.test(platform)) return 'Mac';
+    if (/linux/i.test(platform)) return 'Linux PC';
+
+    // Fallback to User Agent if platform is not specific enough
     if (/Windows NT/i.test(userAgent)) return 'Windows PC';
     if (/Macintosh/i.test(userAgent)) return 'Mac';
     if (/Linux/i.test(userAgent)) return 'Linux PC';
+
     return 'Unknown Device';
 }
 

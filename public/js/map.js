@@ -3,6 +3,8 @@ import { getDeviceIcon } from './device.js';
 
 export let map;
 export const markers = {};
+let followMe = false;
+let selfId = null;
 
 export function initMap(mapId = 'map') {
     map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
@@ -70,18 +72,41 @@ export function switchLayer(name) {
     return false;
 }
 
+export function setSelfId(id) {
+    selfId = id;
+}
+
+export function toggleFollowMe(enabled) {
+    followMe = enabled;
+    if (followMe && selfId && markers[selfId]) {
+        const latLng = markers[selfId].getLatLng();
+        focusMapOnDevice(latLng.lat, latLng.lng);
+    }
+}
+
 export function updateMarker(data) {
     const { id, latitude, longitude, deviceName, accuracy, deviceInfo } = data;
     // Use deviceType from info if available, otherwise fallback to name detection (legacy)
     const typeForIcon = deviceInfo?.deviceType || deviceName;
-    const iconKey = getDeviceIcon(typeForIcon);
+    let iconKey = getDeviceIcon(typeForIcon);
+
+    const isSelf = id === selfId;
 
     if (markers[id]) {
         markers[id].setLatLng([latitude, longitude]);
     } else {
-        markers[id] = L.marker([latitude, longitude], { icon: LEAFLET_ICONS[iconKey] }).addTo(map);
+        const icon = LEAFLET_ICONS[iconKey];
+        markers[id] = L.marker([latitude, longitude], {
+            icon: icon,
+            zIndexOffset: isSelf ? 1000 : 0
+        }).addTo(map);
     }
-    markers[id].bindPopup(createPopupContent(data));
+
+    markers[id].bindPopup(createPopupContent(data, isSelf));
+
+    if (isSelf && followMe) {
+        focusMapOnDevice(latitude, longitude);
+    }
 }
 
 export function removeMarker(peerId) {
@@ -105,7 +130,7 @@ export function openDevicePopup(peerId) {
     }
 }
 
-function createPopupContent(data) {
+function createPopupContent(data, isSelf = false) {
     const { deviceName, latitude, longitude, accuracy, deviceInfo } = data;
     const typeForIcon = deviceInfo?.deviceType || deviceName;
     const iconKey = getDeviceIcon(typeForIcon);
@@ -115,7 +140,7 @@ function createPopupContent(data) {
             <div class="device-popup-header">
                 <img class="device-popup-icon" style="width: 60px; height: 60px;" src="../assets/${iconKey.toLowerCase().replace(' ', '-')}-log.png" alt="Device">
                 <div class="device-header-text">
-                    <span class="device-popup-name">${deviceName}</span>
+                    <span class="device-popup-name">${deviceName}${isSelf ? ' (You)' : ''}</span>
                     <small class="device-popup-type">${deviceInfo?.deviceType || 'Unknown Device'}</small>
                 </div>
             </div>

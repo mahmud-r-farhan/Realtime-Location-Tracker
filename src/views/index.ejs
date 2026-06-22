@@ -52,8 +52,8 @@
     <link rel="icon" type="image/png" href="assets/favico.png">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+    <link rel="stylesheet" href="/vendor/font-awesome/all.min.css">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/panel.css">
     <link rel="stylesheet" href="/css/device.css">
@@ -74,6 +74,7 @@
 
 <body>
     <div id="map"></div>
+    <div id="sos-overlay"></div>
     <div id="sidebar" class="collapsed">
         <div id="sidebar-toggle">
             <i class="fas fa-chevron-left"></i>
@@ -84,6 +85,11 @@
                 <h3 id="user-count">0</h3>
             </div>
             <ul id="device-list"></ul>
+            <div id="room-actions" class="room-actions">
+                <button id="copy-invite-btn" class="copy-invite-btn">
+                    <i class="fas fa-link"></i> Copy Room Invite
+                </button>
+            </div>
             <div id="audio-controls">
                 <button id="mic-btn">
                     <img src="/assets/microphone-muted-icon.png" alt="Microphone">
@@ -215,7 +221,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="/vendor/leaflet/leaflet.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/pwa.js"></script>
     <script type="module" src="/js/main.js"></script>
