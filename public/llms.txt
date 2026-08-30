@@ -1,0 +1,129 @@
+# Realtime Location Tracker
+
+> A high-performance, real-time geolocation tracking system built with Node.js, Express, Socket.IO, and Leaflet.js.
+
+## Overview
+
+The Realtime Location Tracker is a lightweight web application designed to capture real-time spatial updates via HTML5 Geolocation APIs and transmit coordinate shifts instantaneously using WebSockets (`Socket.IO`). Connected client locations are plotted dynamically on an interactive map rendered via `Leaflet.js` and `OpenStreetMap`.
+
+## Key Features
+
+- **Realtime Bidirectional Communication:** Low-latency WebSocket connections via Socket.IO for streaming spatial coordinates.
+- **Client-Side Geolocation:** Uses `navigator.geolocation.watchPosition` for continuous device tracking.
+- **Interactive Mapping:** Interactive map visualization powered by Leaflet.js with customized marker management.
+- **Dynamic Session Handling:** Automatic marker spawning when users connect and marker removal on socket disconnect.
+
+## Tech Stack
+
+### Backend & Middleware
+- **Runtime:** Node.js
+- **Framework:** Express.js (HTTP server hosting & static asset delivery)
+- **Realtime Layer:** Socket.IO (Server instance)
+- **View Engine:** EJS (Embedded JavaScript)
+
+### Frontend & Client Tools
+- **Mapping Library:** Leaflet.js
+- **Tiles Provider:** OpenStreetMap Tile Layer (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`)
+- **Realtime Client:** Socket.IO Client SDK
+- **Geolocation API:** Browser-native HTML5 Geolocation API
+
+## Architecture & Data Flow
+
+1. **Connection Initialization:**
+   - Client accesses the HTTP server via Express.
+   - Server renders the EJS template containing the map canvas and client scripts.
+   - Client establishes a persistent WebSocket connection to the Socket.IO server.
+
+2. **Position Tracking & Emission:**
+   - Client requests high-accuracy location tracking (`enableHighAccuracy: true`).
+   - On position change, client emits a `send-location` event containing `{ latitude, longitude }`.
+
+3. **Broadcasting & Rendering:**
+   - Server listens for `send-location` and broadcasts `{ id: socket.id, latitude, longitude }` to all connected clients (`io.emit`).
+   - Every client receives the coordinates and updates/creates the corresponding marker in the `Leaflet` layer map.
+
+4. **Disconnection Lifecycle:**
+   - On connection termination, server emits `user-disconnected` containing the `socket.id`.
+   - Clients capture this event and remove the corresponding marker layer from the map.
+
+## File Structure
+
+```text
+Realtime-Location-Tracker/
+├── public/
+│   ├── js/
+│   │   └── script.js      # Client-side Socket.IO & Leaflet map logic
+│   └── css/
+│       └── style.css       # Map viewport styling and DOM layout
+├── views/
+│   └── index.ejs          # HTML structure loading Socket.IO, Leaflet, and scripts
+├── app.js                 # Express server & Socket.IO initialization
+├── package.json           # Dependencies and runtime scripts
+└── README.md              # Documentation
+
+```
+
+## Setup & Running Instructions
+
+### Prerequisites
+
+-   Node.js (v14+ recommended)
+    
+      
+    
+-   npm or yarn
+    
+      
+    
+
+### Installation
+
+Bash
+
+```
+# Clone the repository
+git clone [https://github.com/mahmud-r-farhan/Realtime-Location-Tracker.git](https://github.com/mahmud-r-farhan/Realtime-Location-Tracker.git)
+
+# Navigate into project directory
+cd Realtime-Location-Tracker
+
+# Install dependencies
+npm install
+
+```
+
+### Execution
+
+Bash
+
+```
+# Start the application
+npm start
+# or using nodemon for development
+npx nodemon app.js
+
+```
+
+By default, the server runs on `http://localhost:3000`.
+
+  
+
+## Code Conventions & Standards
+
+-   **Asynchronous Events:** Rely on Socket.IO event-driven architecture rather than polling.
+    
+      
+    
+-   **Memory Safety:** Ensure markers are mapped to `socket.id` dictionary keys on the client to allow `O(1)` deletion and prevent client-side memory leaks on long-running sessions.
+    
+      
+    
+-   **Client Configuration:** Set `timeout` and `maximumAge` parameters on `watchPosition` to ensure location freshness while conserving client system resources.
+    
+
+```
+
+<ElicitationsGroup message="Next steps to enhance this repository:">
+  <Elicitation label="Create an llms-full.txt with complete code references" query="Please provide an llms-full.txt file for my Realtime Location Tracker project including the complete implementation details for app.js, script.js, and index.ejs."/>
+  <Elicitation label="Add project optimization & performance tips" query="What architectural or code optimizations can I make to scale this Realtime Location Tracker for higher concurrent connections?"/>
+</ElicitationsGroup>
