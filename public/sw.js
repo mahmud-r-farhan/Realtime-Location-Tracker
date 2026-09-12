@@ -1,9 +1,12 @@
 // Service Worker for Realtime Location Tracker PWA
-const CACHE_NAME = 'location-tracker-v1';
-const STATIC_CACHE_NAME = 'static-cache-v1';
-const DYNAMIC_CACHE_NAME = 'dynamic-cache-v1';
+// NOTE: bump the cache versions whenever precached assets change, so all
+// clients pick up the new files (old caches are purged on activation).
+const CACHE_NAME = 'location-tracker-v2';
+const STATIC_CACHE_NAME = 'static-cache-v2';
+const DYNAMIC_CACHE_NAME = 'dynamic-cache-v2';
 
-// Assets to cache immediately on install
+// Assets to cache immediately on install - includes the full ES-module graph
+// (main.js imports every other module, so all of them are required offline).
 const STATIC_ASSETS = [
     '/',
     '/css/style.css',
@@ -16,14 +19,35 @@ const STATIC_ASSETS = [
     '/css/responsive.css',
     '/css/icon.css',
     '/css/sos.css',
+    '/vendor/leaflet/leaflet.js',
+    '/vendor/leaflet/leaflet.css',
+    '/vendor/font-awesome/all.min.css',
+    '/vendor/font-awesome/webfonts/fa-solid-900.woff2',
+    '/vendor/font-awesome/webfonts/fa-regular-400.woff2',
+    '/vendor/font-awesome/webfonts/fa-brands-400.woff2',
     '/js/main.js',
-    '/js/pwa.js',
+    '/js/config.js',
+    '/js/utils.js',
+    '/js/map.js',
+    '/js/device.js',
+    '/js/ui.js',
+    '/js/notification.js',
+    '/js/socket.js',
+    '/js/audio.js',
+    '/js/chat.js',
+    '/js/sounds.js',
+    '/js/theme.js',
+    '/js/controls.js',
+    '/js/profile.js',
+    '/js/batteryMonitor.js',
     '/js/sos.js',
+    '/js/pwa.js',
     '/assets/favico.png',
     '/assets/android-log.png',
     '/assets/ios-log.png',
     '/assets/windows-log.png',
     '/assets/mac-log.png',
+    '/assets/linux-log.png',
     '/assets/unknown-log.png',
     '/assets/microphone-muted-icon.png',
     '/assets/microphone-on-icon.png',
@@ -35,40 +59,40 @@ const STATIC_ASSETS = [
     '/offline.html'
 ];
 
-// External resources to cache
-const EXTERNAL_ASSETS = [
-    'https://unpkg.com/leaflet@1.7.1/dist/leaflet.css',
-    'https://unpkg.com/leaflet@1.7.1/dist/leaflet.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css'
+// Map tile hosts that should be cached network-first (offline map support)
+const TILE_HOST_PATTERNS = [
+    /(^|\.)tile\.openstreetmap\.org$/i,
+    /(^|\.)tile\.opentopomap\.org$/i,
+    /(^|\.)tile-cyclosm\.openstreetmap\.fr$/i,
+    /(^|\.)tile\.thunderforest\.com$/i,
+    /(^|\.)basemaps\.cartocdn\.com$/i,
+    /(^|\.)arcgisonline\.com$/i
 ];
+
+function isTileRequest(url) {
+    return TILE_HOST_PATTERNS.some((pattern) => pattern.test(url.hostname));
+}
+
+// Upper bound for the runtime caches so they cannot grow without limit
+const MAX_DYNAMIC_CACHE_ENTRIES = 500;
+
+async function trimCache(cacheName, maxEntries) {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    while (keys.length > maxEntries) {
+        await cache.delete(keys.shift());
+    }
+}
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
     console.log('[SW] Installing Service Worker...');
 
     event.waitUntil(
-        Promise.all([
-            // Cache static assets
-            caches.open(STATIC_CACHE_NAME).then((cache) => {
-                console.log('[SW] Caching static assets...');
-                return cache.addAll(STATIC_ASSETS.filter(url => !url.startsWith('http')));
-            }),
-            // Cache external assets
-            caches.open(DYNAMIC_CACHE_NAME).then((cache) => {
-                console.log('[SW] Caching external assets...');
-                return Promise.allSettled(
-                    EXTERNAL_ASSETS.map(url =>
-                        fetch(url, { mode: 'cors' })
-                            .then(response => {
-                                if (response.ok) {
-                                    return cache.put(url, response);
-                                }
-                            })
-                            .catch(err => console.log('[SW] Failed to cache external:', url))
-                    )
-                );
-            })
-        ]).then(() => {
+        caches.open(STATIC_CACHE_NAME).then((cache) => {
+            console.log('[SW] Caching static assets...');
+            return cache.addAll(STATIC_ASSETS);
+        }).then(() => {
             console.log('[SW] Installation complete');
             return self.skipWaiting();
         })
@@ -119,7 +143,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Handle tile requests (map tiles) - Network first, then cache
-    if (url.hostname.includes('tile.openstreetmap.org')) {
+    if (isTileRequest(url)) {
         event.respondWith(
             caches.open(DYNAMIC_CACHE_NAME).then((cache) => {
                 return fetch(request)
@@ -216,6 +240,7 @@ self.addEventListener('fetch', (event) => {
                         const responseClone = response.clone();
                         caches.open(DYNAMIC_CACHE_NAME).then((cache) => {
                             cache.put(request, responseClone);
+                            trimCache(DYNAMIC_CACHE_NAME, MAX_DYNAMIC_CACHE_ENTRIES);
                         });
                     }
                     return response;

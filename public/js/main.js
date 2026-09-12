@@ -10,7 +10,8 @@ import { LOCATION_SEND_INTERVAL, LOCATION_IDLE_INTERVAL } from './config.js';
 import { initTheme } from './theme.js';
 import { initControls } from './controls.js';
 import { initBatteryMonitor } from './batteryMonitor.js';
-import { getUserName, getOrgName, updateProfile, initProfile } from './profile.js';
+import { getUserName, getOrgName, updateProfile } from './profile.js';
+import { haversineDistance } from './utils.js';
 
 // Expose focusMapOnDevice globally for SOS
 window.focusMapOnLocation = focusMapOnDevice;
@@ -32,15 +33,22 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
 
 const deviceName = getDeviceName();
 let locationSendIntervalId = null;
-let lastAcceleration = { x: 0, y: 0, z: 0 };
-let stationaryCounter = 0;
 let isStationary = false;
+let appInitialized = false;
+
+// Motion-based battery optimization: slow GPS polling after the device has
+// been motionless for a while (time-based rather than counting events, since
+// devicemotion frequency varies across devices).
+const MOTION_THRESHOLD = 0.5;          // total acceleration delta treated as "no movement"
+const STATIONARY_AFTER_MS = 10_000;    // 10s without motion => idle mode
+let lastMotionTime = Date.now();
+let lastAcceleration = { x: 0, y: 0, z: 0 };
 
 // Listen for profile updates
 window.addEventListener('profileUpdate', (e) => {
     const { userName, orgName } = e.detail;
     setCurrentChatUser(userName || deviceName);
-    // Optionally rejoin room if org changed
+    // Re-join so the server moves us to the new organization/fleet room
     emitJoinRoom(orgName, userName || deviceName);
     addNotification('🔄 Profile updated synced');
 });
@@ -50,7 +58,7 @@ function initMotionDetection() {
     if ('DeviceMotionEvent' in window) {
         window.addEventListener('devicemotion', (event) => {
             const acc = event.accelerationIncludingGravity;
-            if (!acc) return;
+            if (!acc || acc.x === null) return;
 
             const deltaX = Math.abs(acc.x - lastAcceleration.x);
             const deltaY = Math.abs(acc.y - lastAcceleration.y);
@@ -58,36 +66,31 @@ function initMotionDetection() {
 
             lastAcceleration = { x: acc.x, y: acc.y, z: acc.z };
 
-            // Simple threshold to detect movement
             const totalMovement = deltaX + deltaY + deltaZ;
 
-            if (totalMovement < 0.5) { // Threshold for "no movement"
-                stationaryCounter++;
-            } else {
-                stationaryCounter = 0;
+            if (totalMovement >= MOTION_THRESHOLD) {
+                lastMotionTime = Date.now();
                 if (isStationary) {
-                    console.log("Motion detected! Increasing update frequency.");
+                    console.log('Motion detected! Increasing update frequency.');
                     isStationary = false;
                     startLocationUpdates(LOCATION_SEND_INTERVAL);
                 }
-            }
-
-            // If stationary for ~10 seconds (~60 events at 60ms default interval roughly, usually events fire frequently)
-            // Let's rely on time check implicitly by counter size or just check periodically
-            if (stationaryCounter > 100 && !isStationary) { // Arbitrary number of events
-                console.log("Device stationary. Reducing update frequency.");
+            } else if (!isStationary && Date.now() - lastMotionTime >= STATIONARY_AFTER_MS) {
+                console.log('Device stationary. Reducing update frequency.');
                 isStationary = true;
                 startLocationUpdates(LOCATION_IDLE_INTERVAL);
             }
         });
-        console.log("Motion detection initialized for Battery Optimization.");
+        console.log('Motion detection initialized for Battery Optimization.');
     } else {
-        console.warn("DeviceMotionEvent not supported. Battery optimization disabled.");
+        console.warn('DeviceMotionEvent not supported. Battery optimization disabled.');
     }
 }
 
-
-let lastLocation = { latitude: 0, longitude: 0 };
+let lastLocation = null;
+// GPS readings jitter by several meters even when standing still; exact float
+// comparison never deduplicates. Skip sends when movement is below this.
+const MIN_SEND_DISTANCE_METERS = 8;
 
 async function sendLocationData() {
     if (!('geolocation' in navigator)) {
@@ -98,21 +101,23 @@ async function sendLocationData() {
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: !isStationary, // Disable high accuracy if stationary to save battery
-                timeout: 5000,
-                maximumAge: 0
+                timeout: 15000,
+                maximumAge: 5000
             });
         });
 
         const { latitude, longitude, accuracy } = position.coords;
 
-        // Optimization: Don't send if location hasn't changed significantly
-        if (latitude === lastLocation.latitude && longitude === lastLocation.longitude) {
-            return;
+        // Optimization: don't send if the device hasn't moved meaningfully
+        if (lastLocation) {
+            const moved = haversineDistance(lastLocation.latitude, lastLocation.longitude, latitude, longitude);
+            if (moved < MIN_SEND_DISTANCE_METERS) {
+                return;
+            }
         }
 
         lastLocation = { latitude, longitude };
-        
-        const deviceInfo = await getDeviceInfo();
+
         const displayName = getUserName() || deviceName;
 
         emitSendLocation({
@@ -120,7 +125,7 @@ async function sendLocationData() {
             longitude,
             deviceName: displayName,
             accuracy,
-            deviceInfo
+            deviceInfo: await getDeviceInfo() // Cached internally; cheap after first call
         });
     } catch (error) {
         console.error('Error getting location:', error);
@@ -128,6 +133,11 @@ async function sendLocationData() {
         if (error.code === 1) {
             addNotification('Location access denied.');
             showPermissionDeniedAlert('location');
+            // Stop polling - retrying a denied permission just burns battery
+            if (locationSendIntervalId) {
+                clearInterval(locationSendIntervalId);
+                locationSendIntervalId = null;
+            }
         }
     }
 }
@@ -166,6 +176,11 @@ function startLocationUpdates(interval) {
 }
 
 function initializeApp() {
+    // Guard against double initialization (e.g. double-click on "Continue"),
+    // which would register duplicate socket listeners and timers.
+    if (appInitialized) return;
+    appInitialized = true;
+
     // Initialize theme system first (applies CSS variables)
     initTheme();
 

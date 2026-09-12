@@ -108,7 +108,7 @@ realtime-location-tracker/
 │   ├── views/                  # EJS templates
 │   └── app.js                  # Entry point
 ├── package.json
-├── dockerfile
+├── Dockerfile
 └── README.md
 ```
 

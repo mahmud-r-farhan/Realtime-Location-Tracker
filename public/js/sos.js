@@ -1,12 +1,14 @@
 import { socket } from './socket.js';
 import { getDeviceInfo, getDeviceName } from './device.js';
 import { addNotification } from './notification.js';
+import { escapeHtml, isValidLatLng } from './utils.js';
 
 // SOS State
 let sosHoldTimer = null;
 let isSOSActive = false;
 let sosAlerts = [];
 const SOS_HOLD_DURATION = 2000; // 2 seconds hold to trigger SOS
+const MAX_SOS_ALERTS = 50;
 
 // Audio context for SOS sound
 let audioContext = null;
@@ -16,6 +18,7 @@ export function initSOS() {
     setupSOSModal();
     initSOSSocketHandlers();
     loadSOSFromStorage();
+    setupSOSListActions();
     console.log('[SOS] SOS module initialized');
 }
 
@@ -41,13 +44,9 @@ function setupSOSButton() {
     sosButton.addEventListener('touchcancel', cancelSOSHold);
 
     // Click handler to open modal (only if not holding)
-    let clickTimer = null;
     sosButton.addEventListener('click', () => {
         if (!isSOSActive && !sosHoldTimer) {
-            // Small delay to differentiate from hold
-            clickTimer = setTimeout(() => {
-                openSOSModal();
-            }, 50);
+            openSOSModal('alerts');
         }
     });
 
@@ -157,9 +156,6 @@ function getCurrentPosition() {
 }
 
 
-
-
-
 function setupSOSModal() {
     const modal = document.getElementById('sos-modal');
     const closeBtn = document.getElementById('sos-modal-close');
@@ -171,7 +167,9 @@ function setupSOSModal() {
     }
 
     // Close button
-    closeBtn.addEventListener('click', closeSOSModal);
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeSOSModal);
+    }
 
     // Click outside to close
     modal.addEventListener('click', (e) => {
@@ -272,9 +270,9 @@ async function addSOSToList(sosData) {
             console.log('[SOS] Could not fetch IP geolocation:', error);
         }
     }
-    
+
     sosAlerts.unshift(sosData);
-    if (sosAlerts.length > 50) sosAlerts.pop();
+    if (sosAlerts.length > MAX_SOS_ALERTS) sosAlerts.pop();
     saveSOSToStorage();
     renderSOSAlerts();
     updateSOSCount();
@@ -282,7 +280,7 @@ async function addSOSToList(sosData) {
 
 async function fetchIPGeolocation(ip) {
     try {
-        const response = await fetch(`https://ipapi.co/${ip}/json/`);
+        const response = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`);
         if (!response.ok) throw new Error('IP geolocation fetch failed');
         const data = await response.json();
         return {
@@ -311,104 +309,113 @@ function renderSOSAlerts() {
         return;
     }
 
-    list.innerHTML = sosAlerts.map((sos, index) => `
+    // All SOS fields originate from remote clients - escape everything.
+    list.innerHTML = sosAlerts.map((sos, index) => {
+        const lat = sos?.location && Number(sos.location.latitude);
+        const lng = sos?.location && Number(sos.location.longitude);
+        const accuracy = Number(sos?.location?.accuracy) || 0;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''; // Skip malformed entries
+
+        const safeSender = escapeHtml(sos.sender || 'Unknown');
+        const safeIp = escapeHtml(sos.ipInfo?.ip || 'Unknown');
+        const safePlatform = escapeHtml(sos.deviceInfo?.deviceType || sos.deviceInfo?.os || 'Unknown');
+        const hasIpLocation = sos.ipInfo?.city && sos.ipInfo?.country;
+        const hasBattery = sos.deviceInfo?.battery && Number.isFinite(sos.deviceInfo.battery.level);
+
+        return `
         <div class="sos-alert-item ${sos.isOwn ? 'own' : ''}" data-index="${index}">
             <div class="sos-alert-header">
                 <span class="sos-alert-sender">
-                    ${sos.isOwn ? '📤' : '📥'} ${sos.sender}
+                    ${sos.isOwn ? '📤' : '📥'} ${safeSender}
                 </span>
                 <span class="sos-alert-time">${formatTime(sos.timestamp)}</span>
             </div>
             <div class="sos-alert-details">
                 <div class="sos-detail">
                     <span class="detail-label">📍 Location:</span>
-                    <span class="detail-value">${sos.location.latitude.toFixed(6)}, ${sos.location.longitude.toFixed(6)}</span>
+                    <span class="detail-value">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
                 </div>
                 <div class="sos-detail">
                     <span class="detail-label">🎯 Accuracy:</span>
-                    <span class="detail-value">${sos.location.accuracy.toFixed(0)}m</span>
+                    <span class="detail-value">${accuracy.toFixed(0)}m</span>
                 </div>
                 <div class="sos-detail">
                     <span class="detail-label">🌐 IP Address:</span>
-                    <span class="detail-value">${sos.ipInfo?.ip || 'Unknown'}</span>
+                    <span class="detail-value">${safeIp}</span>
                 </div>
-                ${sos.ipInfo?.city && sos.ipInfo?.country ? `
+                ${hasIpLocation ? `
                 <div class="sos-detail">
                     <span class="detail-label">🏙️ Location:</span>
-                    <span class="detail-value">${sos.ipInfo.city}, ${sos.ipInfo.country}</span>
+                    <span class="detail-value">${escapeHtml(sos.ipInfo.city)}, ${escapeHtml(sos.ipInfo.country)}</span>
                 </div>
                 ` : ''}
                 <div class="sos-detail">
                     <span class="detail-label">📱 Device:</span>
-                    <span class="detail-value">${sos.deviceInfo?.platform || 'Unknown'}</span>
+                    <span class="detail-value">${safePlatform}</span>
                 </div>
-                ${sos.deviceInfo?.battery ? `
+                ${hasBattery ? `
                 <div class="sos-detail">
                     <span class="detail-label">🔋 Battery:</span>
-                    <span class="detail-value">${sos.deviceInfo.battery.level}% ${sos.deviceInfo.battery.charging ? '⚡' : ''}</span>
+                    <span class="detail-value">${Number(sos.deviceInfo.battery.level)}% ${sos.deviceInfo.battery.charging ? '⚡' : ''}</span>
                 </div>
                 ` : ''}
             </div>
             <div class="sos-alert-actions">
-                <button class="sos-action-btn view-map" onclick="window.viewSOSOnMap(${index})">
+                <button class="sos-action-btn view-map">
                     <span>🗺️</span> View on Map
                 </button>
-                <button class="sos-action-btn dismiss" onclick="window.dismissSOS(${index})">
+                <button class="sos-action-btn dismiss">
                     <span>✓</span> Dismiss
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 /**
- * Format timestamp
+ * Event delegation for the "View on Map" / "Dismiss" buttons (replaces the
+ * previous inline onclick="window.*" handlers).
  */
-function formatTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
+function setupSOSListActions() {
+    const list = document.getElementById('sos-alerts-list');
+    if (!list) return;
 
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return date.toLocaleDateString();
+    list.addEventListener('click', (e) => {
+        const button = e.target.closest('.sos-action-btn');
+        if (!button) return;
+        const item = button.closest('.sos-alert-item');
+        if (!item || item.dataset.index === undefined) return;
+
+        const index = Number(item.dataset.index);
+        if (!Number.isInteger(index) || index < 0 || index >= sosAlerts.length) return;
+
+        if (button.classList.contains('view-map')) {
+            viewSOSOnMap(index);
+        } else if (button.classList.contains('dismiss')) {
+            dismissSOS(index);
+        }
+    });
 }
 
-/**
- * Update SOS count badge
- */
-function updateSOSCount() {
-    const countEl = document.getElementById('sos-count');
-    if (!countEl) return;
-
-    const count = sosAlerts.filter(s => !s.dismissed).length;
-
-    if (count > 0) {
-        countEl.textContent = count;
-        countEl.classList.remove('hidden');
-    } else {
-        countEl.classList.add('hidden');
-    }
-}
-
-window.viewSOSOnMap = function (index) {
+function viewSOSOnMap(index) {
     const sos = sosAlerts[index];
-    if (sos && window.focusMapOnLocation) {
+    if (sos && isValidLatLng(sos.location?.latitude, sos.location?.longitude) && window.focusMapOnLocation) {
         window.focusMapOnLocation(sos.location.latitude, sos.location.longitude);
         closeSOSModal();
     }
-};
+}
 
 /**
- * Dismiss SOS alert (global function)
+ * Dismiss SOS alert
  */
-window.dismissSOS = function (index) {
+function dismissSOS(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= sosAlerts.length) return;
     sosAlerts.splice(index, 1);
     saveSOSToStorage();
     renderSOSAlerts();
     updateSOSCount();
-};
+}
 
 /**
  * Play SOS notification sound
@@ -492,19 +499,23 @@ function initSOSSocketHandlers() {
 
 
 async function showBrowserNotification(sosData) {
-    if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
+    if (!('Notification' in window)) return;
+
+    if (Notification.permission === 'granted') {
+        try {
             new Notification('🚨 SOS Alert!', {
-                body: `Emergency from ${sosData.sender}\nLocation: ${sosData.location.latitude.toFixed(4)}, ${sosData.location.longitude.toFixed(4)}`,
+                body: `Emergency from ${sosData.sender}\nLocation: ${Number(sosData.location?.latitude ?? 0).toFixed(4)}, ${Number(sosData.location?.longitude ?? 0).toFixed(4)}`,
                 icon: '/assets/icons/icon.svg',
                 tag: 'sos-alert',
                 requireInteraction: true
             });
-        } else if (Notification.permission !== 'denied') {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                showBrowserNotification(sosData);
-            }
+        } catch (e) {
+            console.warn('[SOS] Could not show browser notification:', e);
+        }
+    } else if (Notification.permission !== 'denied') {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            showBrowserNotification(sosData);
         }
     }
 }
@@ -522,10 +533,22 @@ function saveSOSToStorage() {
 function loadSOSFromStorage() {
     try {
         const stored = localStorage.getItem('sosAlerts');
-        if (stored) {
-            sosAlerts = JSON.parse(stored);
-            updateSOSCount();
-        }
+        if (!stored) return;
+
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) return;
+
+        // Validate persisted entries - localStorage content can be stale or
+        // hand-edited, and the renderer assumes a usable shape.
+        sosAlerts = parsed.filter((sos) =>
+            sos &&
+            typeof sos === 'object' &&
+            sos.location &&
+            isValidLatLng(Number(sos.location.latitude), Number(sos.location.longitude)) &&
+            typeof sos.sender === 'string'
+        ).slice(0, 20);
+
+        updateSOSCount();
     } catch (e) {
         console.log('[SOS] Could not load from storage');
     }

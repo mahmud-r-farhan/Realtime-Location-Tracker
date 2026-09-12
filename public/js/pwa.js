@@ -85,6 +85,7 @@ class PWAManager {
 
         this.swRegistration.addEventListener('updatefound', () => {
             const newWorker = this.swRegistration.installing;
+            if (!newWorker) return;
 
             newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {

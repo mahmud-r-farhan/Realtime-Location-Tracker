@@ -38,6 +38,24 @@ module.exports = function setupMiddleware(app) {
         }
     }));
 
+    app.use(compression());
+
+    // Static assets are served BEFORE the rate limiter: a single page load
+    // fetches ~30 static files, which would otherwise exhaust the production
+    // request budget (100 req / 15 min) after only a few reloads.
+    app.use(express.static(path.join(__dirname, '../../public'), {
+        maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+        setHeaders: (res, filePath) => {
+            const filename = path.basename(filePath);
+            // The service worker and manifest must always revalidate so
+            // updates propagate; long-lived caching would strand clients
+            // on old versions.
+            if (filename === 'sw.js' || filename === 'manifest.json') {
+                res.setHeader('Cache-Control', 'no-cache');
+            }
+        }
+    }));
+
     const limiter = rateLimit({
         windowMs: process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 1 * 60 * 1000,
         max: process.env.NODE_ENV === 'production' ? 100 : 2000,
@@ -48,20 +66,11 @@ module.exports = function setupMiddleware(app) {
     });
     app.use(limiter);
 
-    app.use(compression());
-    app.use(express.json({ limit: '10mb' }));
-    app.use(express.urlencoded({ limit: '10mb', extended: true }));
+    // No HTTP routes accept large bodies (all realtime data flows over
+    // Socket.IO), so a small cap is sufficient and limits abuse surface.
+    app.use(express.json({ limit: '100kb' }));
+    app.use(express.urlencoded({ limit: '100kb', extended: true }));
 
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, '../views'));
-
-    app.use(express.static(path.join(__dirname, '../../public'), {
-        maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
-        setHeaders: (res, filePath) => {
-            if (filePath.endsWith('.js')) {
-                res.setHeader('Content-Type', 'application/javascript');
-            }
-            res.setHeader('X-Content-Type-Options', 'nosniff');
-        }
-    }));
 };

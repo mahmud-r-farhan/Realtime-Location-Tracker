@@ -74,44 +74,32 @@ function showBatteryAlert(deviceName, level, type) {
     addNotification(message);
 
     // Show browser notification if permitted
-    if (Notification.permission === 'granted') {
-        new Notification(`Battery ${type === 'critical' ? 'Critical' : 'Low'}`, {
-            body: `${deviceName} battery is at ${level}%`,
-            icon: '/assets/icons/icon.svg',
-            tag: `battery-${type}-${deviceName}`
-        });
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            new Notification(`Battery ${type === 'critical' ? 'Critical' : 'Low'}`, {
+                body: `${deviceName} battery is at ${level}%`,
+                icon: '/assets/icons/icon.svg',
+                tag: `battery-${type}-${deviceName}`
+            });
+        } catch (e) {
+            // Some browsers throw when constructing notifications (e.g. SW-less contexts)
+            console.warn('Could not show battery notification:', e);
+        }
     }
 }
 
 /**
- * Play battery alert sound
+ * Play battery alert sound.
+ * Uses the shared AudioContext from sounds.js - creating a new context per
+ * alert eventually hits the browser's ~6 context cap and silences all audio.
  */
 function playBatteryAlertSound(type) {
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        if (type === 'critical') {
-            // More urgent sound for critical
-            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-            oscillator.type = 'square';
-            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-        } else {
-            // Gentle beep for low
-            oscillator.frequency.setValueAtTime(660, audioContext.currentTime);
-            oscillator.type = 'sine';
-            gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
-        }
-
-        oscillator.start(audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        oscillator.stop(audioContext.currentTime + 0.3);
-    } catch (e) {
-        console.warn('Could not play battery alert sound:', e);
+    if (type === 'critical') {
+        // More urgent sound for critical
+        playTone({ frequency: 880, type: 'square', duration: 0.3, volume: 0.1 });
+    } else {
+        // Gentle beep for low
+        playTone({ frequency: 660, type: 'sine', duration: 0.3, volume: 0.05 });
     }
 }
 
@@ -134,18 +122,6 @@ export function getAllBatteryInfo() {
         id,
         ...info
     }));
-}
-
-/**
- * Get battery icon based on level and charging status
- */
-function getBatteryIcon(level, charging) {
-    if (charging) return '⚡';
-    if (level > 75) return '🔋';
-    if (level > 50) return '🔋';
-    if (level > 25) return '🪫';
-    if (level > 10) return '🪫';
-    return '🪫';
 }
 
 /**

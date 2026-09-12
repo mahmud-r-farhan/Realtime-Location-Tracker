@@ -10,9 +10,20 @@ export function addNotification(message) {
     playNotificationBeep();
 
     const list = document.getElementById('notification-list');
+    if (!list) return;
+
+    // Build with textContent so dynamic parts (device names, server messages)
+    // can never be interpreted as HTML.
     const time = new Date().toLocaleTimeString();
     const li = document.createElement('li');
-    li.innerHTML = `<span class="notification-time">[${time}]</span> ${message}`;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'notification-time';
+    timeSpan.textContent = `[${time}] `;
+
+    li.appendChild(timeSpan);
+    li.appendChild(document.createTextNode(message));
+
     list.insertBefore(li, list.firstChild);
     if (list.children.length > MAX_NOTIFICATIONS) {
         list.removeChild(list.lastChild);
@@ -22,12 +33,15 @@ export function addNotification(message) {
 }
 
 export function initNotificationPanel() {
-    document.getElementById('notification-toggle').addEventListener('click', () => {
-        const panel = document.getElementById('notification-panel');
+    const toggleBtn = document.getElementById('notification-toggle');
+    const panel = document.getElementById('notification-panel');
+    if (!toggleBtn || !panel) return;
+
+    toggleBtn.addEventListener('click', () => {
         panel.classList.toggle('minimized');
-        document.getElementById('notification-toggle').textContent = panel.classList.contains('minimized') ? '+' : '-';
+        toggleBtn.textContent = panel.classList.contains('minimized') ? '+' : '-';
     });
-    setupDraggable(document.getElementById('notification-panel'), document.querySelector('.drag-handle'));
+    setupDraggable(panel, panel.querySelector('.drag-handle'));
 }
 
 function setupDraggable(element, handle) {
@@ -35,9 +49,9 @@ function setupDraggable(element, handle) {
     if (!handle || !element) return console.error("Draggable setup failed.");
     handle.style.cursor = 'grab';
     handle.addEventListener('mousedown', (e) => {
-        if (e.target.tagName === 'BUTTON' || e.target.parentElement.tagName === 'BUTTON') return;
+        if (e.target.tagName === 'BUTTON' || e.target.parentElement?.tagName === 'BUTTON') return;
         const style = window.getComputedStyle(element);
-        const matrix = new DOMMatrixReadOnly(style.transform);
+        const matrix = new DOMMatrixReadOnly(style.transform === 'none' ? '' : style.transform);
         xOffset = matrix.m41;
         yOffset = matrix.m42;
         initialX = e.clientX - xOffset;

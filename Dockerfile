@@ -1,35 +1,22 @@
 # Real-Time Location Tracker
-# Multi-stage build for production
+# Production image - single stage (no build step is required for this app)
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
-# Set working directory
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies (including devDependencies for build)
-RUN npm ci --only=production
-
-# Stage 2: Production
-FROM node:20-alpine AS production
-
-# Labels
 LABEL maintainer="Mahmud R. Farhan"
 LABEL description="Real-Time Location Tracker with WebRTC Audio Support"
-LABEL version="4.2.0"
 
 # Set working directory
 WORKDIR /app
+
+# Install production dependencies only.
+# `npm ci` requires a clean lockfile state and gives reproducible installs.
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
-
-# Copy node_modules from builder
-COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application files
 COPY --chown=nodejs:nodejs . .
@@ -43,7 +30,7 @@ EXPOSE 3007
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3007/ || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3007/health || exit 1
 
 # Switch to non-root user
 USER nodejs

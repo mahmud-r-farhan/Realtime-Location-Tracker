@@ -127,22 +127,6 @@ export function toggleMapLayerDropdown() {
 }
 
 /**
- * Switch map layer
- * @param {string} layerName - Name of the layer to switch to
- */
-export function switchMapLayer(layerName) {
-    // Close dropdown
-    toggleMapLayerDropdown();
-
-    // Find the layer control and trigger the layer switch
-    if (map) {
-        const layers = map._layers;
-        // This will be handled by Leaflet's layer control
-        addNotification(`🗺️ Switched to ${layerName} view`);
-    }
-}
-
-/**
  * Handle theme toggle from controls
  */
 export function handleThemeToggle() {
@@ -222,6 +206,40 @@ function createMobileControls() {
 }
 
 /**
+ * Shared profile editor flow (used by both the FAB and mobile buttons).
+ * Updates go through profile.updateProfile(), which dispatches the
+ * profileUpdate event that re-joins the room - no page reload needed.
+ */
+function openProfileEditor() {
+    const nameInput = document.getElementById('user-name-input');
+    const orgInput = document.getElementById('org-input');
+    const continueBtn = document.getElementById('continue-btn');
+    if (!nameInput || !orgInput || !continueBtn) return;
+
+    // Pre-fill current values
+    nameInput.value = getUserName() || '';
+    orgInput.value = getOrgName() === 'public' ? '' : getOrgName();
+
+    showNamePopup();
+
+    const handleSave = () => {
+        const newName = nameInput.value.trim();
+        const newOrg = orgInput.value.trim();
+
+        updateProfile(newName, newOrg);
+        addNotification('✅ Profile updated!');
+
+        document.getElementById('name-popup')?.classList.add('hidden');
+        continueBtn.removeEventListener('click', handleSave);
+    };
+
+    // Remove previous listeners (cloning node is a dirty but effective reset)
+    const newBtn = continueBtn.cloneNode(true);
+    continueBtn.parentNode.replaceChild(newBtn, continueBtn);
+    newBtn.addEventListener('click', handleSave);
+}
+
+/**
  * Attach event listeners
  */
 function attachEventListeners() {
@@ -252,39 +270,7 @@ function attachEventListeners() {
     // FAB Profile Button
     const fabProfileBtn = document.getElementById('fab-profile-btn');
     if (fabProfileBtn) {
-        fabProfileBtn.addEventListener('click', () => {
-            // Pre-fill current values
-            const currentName = localStorage.getItem('userName') || '';
-            const currentOrg = localStorage.getItem('orgName') || '';
-
-            const nameInput = document.getElementById('user-name-input');
-            const orgInput = document.getElementById('org-input');
-
-            if (nameInput) nameInput.value = currentName;
-            if (orgInput) orgInput.value = currentOrg;
-
-            showNamePopup();
-
-            // Handle Save
-            const continueBtn = document.getElementById('continue-btn');
-            const handleSave = () => {
-                const newName = nameInput.value.trim();
-                const newOrg = orgInput.value.trim();
-
-                if (newName || newOrg) {
-                    updateProfile(newName, newOrg);
-                    addNotification('✅ Profile updated!');
-                }
-
-                document.getElementById('name-popup').classList.add('hidden');
-                continueBtn.removeEventListener('click', handleSave);
-            };
-
-            // Remove previous listeners (cloning node is a dirty but effective reset)
-            const newBtn = continueBtn.cloneNode(true);
-            continueBtn.parentNode.replaceChild(newBtn, continueBtn);
-            newBtn.addEventListener('click', handleSave);
-        });
+        fabProfileBtn.addEventListener('click', openProfileEditor);
     }
 
     // Mobile Theme Button
@@ -308,46 +294,7 @@ function attachEventListeners() {
     // Mobile Profile Button
     const mobileProfileBtn = document.getElementById('mobile-profile-btn');
     if (mobileProfileBtn) {
-        mobileProfileBtn.addEventListener('click', () => {
-            // Pre-fill current values
-            const currentName = localStorage.getItem('userName') || '';
-            const currentOrg = localStorage.getItem('orgName') || '';
-
-            const nameInput = document.getElementById('user-name-input');
-            const orgInput = document.getElementById('org-input');
-
-            if (nameInput) nameInput.value = currentName;
-            if (orgInput) orgInput.value = currentOrg;
-
-            showNamePopup();
-
-            // Handle Save
-            const continueBtn = document.getElementById('continue-btn');
-            const handleSave = () => {
-                const newName = nameInput.value.trim();
-                const newOrg = orgInput.value.trim();
-
-                if (newName) {
-                    localStorage.setItem('userName', newName);
-                }
-                if (newOrg) {
-                    localStorage.setItem('orgName', newOrg);
-                }
-
-                addNotification('✅ Profile updated! Reloading...');
-                document.getElementById('name-popup').classList.add('hidden');
-
-                // Reload to apply changes cleanly across all sockets/modules
-                setTimeout(() => window.location.reload(), 1000);
-
-                continueBtn.removeEventListener('click', handleSave);
-            };
-
-            // Remove previous listeners (cloning node is a dirty but effective reset)
-            const newBtn = continueBtn.cloneNode(true);
-            continueBtn.parentNode.replaceChild(newBtn, continueBtn);
-            newBtn.addEventListener('click', handleSave);
-        });
+        mobileProfileBtn.addEventListener('click', openProfileEditor);
     }
 
     // Close FAB menu when clicking outside
@@ -816,6 +763,3 @@ export function initControls() {
 
     console.log('🎛️ Controls initialized');
 }
-
-// Export for global access
-export { goToMyLocation as focusOnMyLocation };
