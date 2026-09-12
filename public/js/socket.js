@@ -39,8 +39,9 @@ export function initSocketEventHandlers(onJoinSuccess) {
     });
 
     socket.on('receive-location', (data) => {
+        const isNewDevice = !markers[data.id];
         updateMarker(data);
-        if (!Object.keys(markers).includes(data.id)) {
+        if (isNewDevice) {
             addNotification(`${data.deviceName} started sharing location`);
         }
     });

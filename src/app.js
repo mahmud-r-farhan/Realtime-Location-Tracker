@@ -30,9 +30,11 @@ setupSockets(io, connectedDevices, peers);
 app.use((req, res) => {
     res.status(404).render('404', { 
         url: req.originalUrl 
-    }, (err) => {
+    }, (err, html) => {
         if (err) {
             res.status(404).send('Page not found');
+        } else {
+            res.status(404).send(html);
         }
     });
 });
@@ -54,20 +56,24 @@ app.use((err, req, res, next) => {
         message,
         status,
         error: process.env.NODE_ENV === 'production' ? {} : err
-    }, (renderErr) => {
+    }, (renderErr, html) => {
         if (renderErr) {
             res.status(status).send(message);
+        } else {
+            res.status(status).send(html);
         }
     });
 });
 
-// Start server
-const PORT = process.env.PORT || 3007;
-const NODE_ENV = process.env.NODE_ENV || 'development';
+// Start server if run directly
+if (require.main === module) {
+    const PORT = process.env.PORT || 3007;
+    const NODE_ENV = process.env.NODE_ENV || 'development';
 
-server.listen(PORT, () => {
-    console.log(`[${new Date().toISOString()}] Server is running on port ${PORT} (${NODE_ENV})`);
-});
+    server.listen(PORT, () => {
+        console.log(`[${new Date().toISOString()}] Server is running on port ${PORT} (${NODE_ENV})`);
+    });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
@@ -77,3 +83,5 @@ process.on('SIGTERM', () => {
         process.exit(0);
     });
 });
+
+module.exports = { app, server, io };

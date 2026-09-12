@@ -6,15 +6,6 @@ export const markers = {};
 let followMe = false;
 let selfId = null;
 
-export function initMap(mapId = 'map') {
-    map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
-
-    // Initialize with default layer
-    baseLayers['OpenStreetMap'].addTo(map);
-
-    return map;
-}
-
 // Map Layer Definitions
 const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
@@ -61,6 +52,15 @@ export const baseLayers = {
 
 let currentLayer = osm;
 
+export function initMap(mapId = 'map') {
+    map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
+
+    // Initialize with default layer
+    baseLayers['OpenStreetMap'].addTo(map);
+
+    return map;
+}
+
 export function switchLayer(name) {
     const newLayer = baseLayers[name];
     if (newLayer && map) {
@@ -86,7 +86,6 @@ export function toggleFollowMe(enabled) {
 
 export function updateMarker(data) {
     const { id, latitude, longitude, deviceName, accuracy, deviceInfo } = data;
-    // Use deviceType from info if available, otherwise fallback to name detection (legacy)
     const typeForIcon = deviceInfo?.deviceType || deviceName;
     let iconKey = getDeviceIcon(typeForIcon);
 
@@ -95,7 +94,7 @@ export function updateMarker(data) {
     if (markers[id]) {
         markers[id].setLatLng([latitude, longitude]);
     } else {
-        const icon = LEAFLET_ICONS[iconKey];
+        const icon = LEAFLET_ICONS[iconKey] || LEAFLET_ICONS["Unknown Device"];
         markers[id] = L.marker([latitude, longitude], {
             icon: icon,
             zIndexOffset: isSelf ? 1000 : 0
@@ -130,15 +129,27 @@ export function openDevicePopup(peerId) {
     }
 }
 
+function getIconAssetUrl(iconKey) {
+    switch (iconKey) {
+        case 'Android Device': return '/assets/android-log.png';
+        case 'iOS Device': return '/assets/ios-log.png';
+        case 'Windows PC': return '/assets/windows-log.gif';
+        case 'Mac': return '/assets/mac-log.png';
+        case 'Linux PC': return '/assets/linux-log.png';
+        default: return '/assets/unknown-log.png';
+    }
+}
+
 function createPopupContent(data, isSelf = false) {
     const { deviceName, latitude, longitude, accuracy, deviceInfo } = data;
     const typeForIcon = deviceInfo?.deviceType || deviceName;
     const iconKey = getDeviceIcon(typeForIcon);
+    const iconUrl = getIconAssetUrl(iconKey);
 
     return `
         <div class="device-popup">
             <div class="device-popup-header">
-                <img class="device-popup-icon" style="width: 60px; height: 60px;" src="../assets/${iconKey.toLowerCase().replace(' ', '-')}-log.png" alt="Device">
+                <img class="device-popup-icon" style="width: 50px; height: 50px; object-fit: contain;" src="${iconUrl}" alt="Device">
                 <div class="device-header-text">
                     <span class="device-popup-name">${deviceName}${isSelf ? ' (You)' : ''}</span>
                     <small class="device-popup-type">${deviceInfo?.deviceType || 'Unknown Device'}</small>
@@ -165,7 +176,7 @@ function createPopupContent(data, isSelf = false) {
                     <div class="device-info-label">Display</div>
                     <div class="device-info-value">${deviceInfo?.screen || 'N/A'}</div>
                 </div>
-                 <div class="device-info-item">
+                <div class="device-info-item">
                     <div class="device-info-label">Hardware</div>
                     <div class="device-info-value">${deviceInfo?.memory !== 'N/A' ? deviceInfo.memory : ''} ${deviceInfo?.cores !== 'N/A' ? `(${deviceInfo?.cores})` : ''}</div>
                 </div>
