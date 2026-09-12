@@ -55,29 +55,15 @@ export function initSocketEventHandlers(onJoinSuccess) {
         }
     });
 
-    // Bug 5 fix: On reconnect the server assigns a new socket.id but the client
-    // never re-joins the room, silently dumping the user into the public room and
-    // leaving a ghost self-marker on the map.
-    // Fix: re-emit join-room with the stored room + device name so the server
-    // re-registers the socket in the correct room.
-    socket.on('reconnect', (attemptNumber) => {
-        addNotification(`Reconnected to server after ${attemptNumber} attempts`);
-
-        const storedRoom = localStorage.getItem('orgName') || 'public';
-        const storedName = localStorage.getItem('userName') || getDeviceName();
-
-        // Re-join the correct room with the new socket id
-        socket.emit('join-room', { room: storedRoom, deviceName: storedName });
-
-        // Clear the stale self-marker (keyed by old socket id) — the server
-        // will broadcast a new receive-location which recreates it.
-        // We don't know the old id here directly, so we clear all markers whose
-        // popup says "(You)" by relying on setSelfId resetting selfId.
-        setSelfId(socket.id);
-    });
+    // NOTE: 'reconnect' is a Manager-level event in socket.io-client v4 and is
+    // NOT re-emitted on the Socket instance, so a socket.on('reconnect', ...)
+    // handler here would be dead code. Reconnect recovery (re-joining the room
+    // with the new socket id and clearing the ghost self-marker) is fully
+    // handled by the 'connect' listener above, which fires on every reconnect.
 
     socket.on('connect_error', (error) => {
         console.error('Socket connection error:', error.message);
+        addNotification('⚠️ Cannot reach server - retrying...');
     });
 
     socket.on('joined-room', (data) => {

@@ -246,6 +246,69 @@ describe('Socket.IO Realtime Event Handlers', () => {
         await withTimeout(promise, 5000, 'sos-alert');
     });
 
+    it('sos-alert ack returns success and the server-observed IP', async () => {
+        clientSocket1.emit('join-room', { room: 'ack-room', deviceName: 'Sender' });
+
+        await new Promise(r => setTimeout(r, 50));
+        const ack = await withTimeout(new Promise((resolve) => {
+            clientSocket1.emit('sos-alert', {
+                sender: 'Sender',
+                location: { latitude: 10, longitude: 20, accuracy: 5 }
+            }, resolve);
+        }), 5000, 'sos-alert ack');
+
+        assert.strictEqual(ack.success, true);
+        assert.ok(typeof ack.ip === 'string' && ack.ip.length > 0);
+    });
+
+    it('sos-alert relays locationAvailable=false alerts and defaults to true', async () => {
+        clientSocket1.emit('join-room', { room: 'nogps-room', deviceName: 'Lost Hiker' });
+        clientSocket2.emit('join-room', { room: 'nogps-room', deviceName: 'Rescuer' });
+
+        const received = [];
+        const bothReceived = new Promise((resolve) => {
+            clientSocket2.on('sos-alert', (sosData) => {
+                received.push(sosData);
+                if (received.length === 2) resolve();
+            });
+        });
+
+        await new Promise(r => setTimeout(r, 50));
+        // SOS without a usable GPS fix must still be relayed
+        clientSocket1.emit('sos-alert', {
+            sender: 'Lost Hiker',
+            location: { latitude: 0, longitude: 0, accuracy: 0 },
+            locationAvailable: false
+        });
+        // Normal SOS: flag defaults to true when omitted
+        clientSocket1.emit('sos-alert', {
+            sender: 'Lost Hiker',
+            location: { latitude: 51.5074, longitude: -0.1278, accuracy: 10 }
+        });
+
+        await withTimeout(bothReceived, 5000, 'two sos-alerts');
+
+        assert.strictEqual(received[0].locationAvailable, false);
+        assert.strictEqual(received[1].locationAvailable, true);
+    });
+
+    it('sos-alert with a missing location gets an error ack and is not relayed', async () => {
+        clientSocket1.emit('join-room', { room: 'invalid-room', deviceName: 'Broken' });
+        clientSocket2.emit('join-room', { room: 'invalid-room', deviceName: 'Watcher' });
+
+        let relayed = false;
+        clientSocket2.on('sos-alert', () => { relayed = true; });
+
+        await new Promise(r => setTimeout(r, 50));
+        const ack = await withTimeout(new Promise((resolve) => {
+            clientSocket1.emit('sos-alert', { sender: 'Broken' }, resolve);
+        }), 5000, 'invalid sos-alert ack');
+
+        assert.ok(typeof ack.error === 'string' && ack.error.length > 0);
+        await new Promise(r => setTimeout(r, 100));
+        assert.strictEqual(relayed, false);
+    });
+
     it('switching rooms updates the device list of the old room', async () => {
         clientSocket1.emit('join-room', { room: 'room-a', deviceName: 'Mover' });
         clientSocket2.emit('join-room', { room: 'room-a', deviceName: 'Stayer' });

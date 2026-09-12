@@ -511,27 +511,36 @@ export function initAudioControls() {
     const speakerBtn = document.getElementById('speaker-btn');
 
     if (micBtn) {
-        micBtn.addEventListener('click', toggleMic);
+        // A long press leaves the call; the browser still fires a click right
+        // after touchend/mouseup, which would instantly re-join. The flag set
+        // by the long-press timer swallows exactly that one trailing click.
+        micBtn.addEventListener('click', () => {
+            if (suppressNextMicClick) {
+                suppressNextMicClick = false;
+                return;
+            }
+            toggleMic();
+        });
 
         // Add long press to leave call
         let pressTimer;
-        micBtn.addEventListener('mousedown', () => {
-            if (isInCall) {
-                pressTimer = setTimeout(() => {
-                    leaveCall();
-                }, 1000);
-            }
-        });
-        micBtn.addEventListener('mouseup', () => clearTimeout(pressTimer));
-        micBtn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
-        micBtn.addEventListener('touchstart', () => {
-            if (isInCall) {
-                pressTimer = setTimeout(() => {
-                    leaveCall();
-                }, 1000);
-            }
-        });
-        micBtn.addEventListener('touchend', () => clearTimeout(pressTimer));
+        const startLeavePress = () => {
+            suppressNextMicClick = false; // never carry a stale flag into a new press
+            if (!isInCall) return;
+            clearTimeout(pressTimer);
+            pressTimer = setTimeout(() => {
+                suppressNextMicClick = true;
+                leaveCall();
+            }, 1000);
+        };
+        const cancelLeavePress = () => clearTimeout(pressTimer);
+
+        micBtn.addEventListener('mousedown', startLeavePress);
+        micBtn.addEventListener('mouseup', cancelLeavePress);
+        micBtn.addEventListener('mouseleave', cancelLeavePress);
+        micBtn.addEventListener('touchstart', startLeavePress, { passive: true });
+        micBtn.addEventListener('touchend', cancelLeavePress);
+        micBtn.addEventListener('touchcancel', cancelLeavePress);
     }
 
     if (speakerBtn) {

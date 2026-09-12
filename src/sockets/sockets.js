@@ -296,8 +296,20 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             }
         });
 
-        socket.on('sos-alert', (data) => {
-            if (!data || !data.location || isRateLimited(socket, 'sos-alert')) {
+        socket.on('sos-alert', (data, callback) => {
+            // Optional ack: tells the sender whether the alert was relayed and
+            // returns the public IP the server sees (clients cannot know it).
+            const respond = (payload) => {
+                if (typeof callback === 'function') callback(payload);
+            };
+
+            if (!data || !data.location) {
+                respond({ error: 'Invalid SOS payload' });
+                return;
+            }
+
+            if (isRateLimited(socket, 'sos-alert')) {
+                respond({ error: 'Too many SOS alerts sent. Please wait a minute.' });
                 return;
             }
 
@@ -323,6 +335,10 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                     longitude: safeLng,
                     accuracy: Math.max(0, Math.min(acc, 10000))
                 },
+                // False only when the sender explicitly reports no usable GPS
+                // fix; the alert is still relayed so people know there is an
+                // emergency even without coordinates.
+                locationAvailable: data.locationAvailable !== false,
                 deviceInfo: sanitizeDeviceInfo(data.deviceInfo),
                 ipInfo: {
                     ip: socket.clientIP
@@ -333,6 +349,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             };
 
             socket.to(room).emit('sos-alert', sosData);
+            respond({ success: true, ip: socket.clientIP });
         });
 
         // Audio & WebRTC signaling

@@ -111,10 +111,10 @@ body {
   right: 0;
   width: 343px;
   height: 100vh;
-  background: rgba(255, 255, 255, 0.194);
+  background: var(--sidebar-bg, rgba(255, 255, 255, 0.194));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
   transition: transform var(--transition-medium);
   z-index: 1000;
   box-shadow: var(--shadow-heavy);
