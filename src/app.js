@@ -6,27 +6,23 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: process.env.ALLOWED_ORIGINS || '*', // Configurable CORS
+        origin: process.env.ALLOWED_ORIGINS || '*',
         methods: ['GET', 'POST'],
         credentials: true
     }
 });
 
-// In-memory storage
 const connectedDevices = new Map();
 const peers = new Map();
 
-// Setup imports
 const setupMiddleware = require('./middleware/middleware');
 const setupRoutes = require('./routes/routes');
 const setupSockets = require('./sockets/sockets');
 
-// Apply setups
 setupMiddleware(app);
 setupRoutes(app);
 setupSockets(io, connectedDevices, peers);
 
-// 404 handler
 app.use((req, res) => {
     res.status(404).render('404', { 
         url: req.originalUrl 
@@ -39,7 +35,6 @@ app.use((req, res) => {
     });
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
     if (res.headersSent) {
         return next(err);
@@ -65,7 +60,6 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server if run directly
 if (require.main === module) {
     const PORT = process.env.PORT || 3007;
     const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -75,7 +69,6 @@ if (require.main === module) {
     });
 }
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
     console.log('[SIGTERM] Shutting down gracefully...');
     server.close(() => {

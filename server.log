@@ -1,7 +1,0 @@
-
-> realtime_tracker@5.0.0 start
-> node src/app.js
-
-[2026-09-12T08:58:30.329Z] Server is running on port 3007 (development)
-[SIGTERM] Shutting down gracefully...
-Server closed

@@ -5,12 +5,10 @@ const helmet = require('helmet');
 const path = require('path');
 
 module.exports = function setupMiddleware(app) {
-    // Trust proxy in production
     if (process.env.NODE_ENV === 'production') {
         app.set('trust proxy', 1);
     }
 
-    // Security Headers
     app.use(helmet({
         contentSecurityPolicy: {
             directives: {
@@ -34,13 +32,12 @@ module.exports = function setupMiddleware(app) {
             },
         },
         hsts: {
-            maxAge: 31536000, // 1 year
+            maxAge: 31536000,
             includeSubDomains: true,
             preload: true
         }
     }));
 
-    // Rate Limiting
     const limiter = rateLimit({
         windowMs: process.env.NODE_ENV === 'production' ? 15 * 60 * 1000 : 1 * 60 * 1000,
         max: process.env.NODE_ENV === 'production' ? 100 : 2000,
@@ -51,16 +48,13 @@ module.exports = function setupMiddleware(app) {
     });
     app.use(limiter);
 
-    // Compression & Body parsing
     app.use(compression());
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-    // View engine setup
     app.set('view engine', 'ejs');
     app.set('views', path.join(__dirname, '../views'));
 
-    // Serve static files with correct headers
     app.use(express.static(path.join(__dirname, '../../public'), {
         maxAge: process.env.NODE_ENV === 'production' ? '1d' : '0',
         setHeaders: (res, filePath) => {

@@ -48,7 +48,6 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const roomName = sanitizeString(rawRoom, 50) || 'public';
             const deviceName = sanitizeString(rawDeviceName, 50) || 'Unknown';
 
-            // Leave old room if switching
             if (socket.room && socket.room !== roomName) {
                 socket.leave(socket.room);
             }
