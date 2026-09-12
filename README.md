@@ -255,5 +255,3 @@ A: Yes! The PWA caches assets and shows an offline page when connectivity is los
 ---
 
 Star this project if you find it helpful! ⭐
-
-Checkout: https://github.com/mahmud-js/realtime-tracker (Golang powered!)
