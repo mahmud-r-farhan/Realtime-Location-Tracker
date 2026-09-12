@@ -1,6 +1,8 @@
 import { socket } from './socket.js';
 import { getDeviceInfo, getDeviceName } from './device.js';
+import { getUserName } from './profile.js';
 import { addNotification } from './notification.js';
+import { markers } from './map.js';
 import { escapeHtml, isValidLatLng } from './utils.js';
 
 // SOS State
@@ -8,7 +10,12 @@ let sosHoldTimer = null;
 let isSOSActive = false;
 let sosAlerts = [];
 const SOS_HOLD_DURATION = 2000; // 2 seconds hold to trigger SOS
+const SOS_TAP_DURATION = 400;   // shorter than this = tap (opens the alerts modal)
 const MAX_SOS_ALERTS = 50;
+
+// Placeholder shown for our own alert until the server ack tells us our public IP
+const IP_PENDING = 'Pending...';
+const IP_LOOKUP_SKIP = new Set(['Unknown', 'Pending...', 'Fetching...']);
 
 // Audio context for SOS sound
 let audioContext = null;
@@ -35,15 +42,31 @@ function setupSOSButton() {
     sosButton.addEventListener('mouseup', cancelSOSHold);
     sosButton.addEventListener('mouseleave', cancelSOSHold);
 
-    // Touch events for mobile
+    // Touch events for mobile.
+    // preventDefault() on touchstart suppresses the emulated click event, so a
+    // quick tap must be reproduced manually here - otherwise mobile users can
+    // never open the alerts modal with a tap (desktop-only click handler).
+    let touchStartTime = 0;
     sosButton.addEventListener('touchstart', (e) => {
         e.preventDefault();
+        touchStartTime = Date.now();
         startSOSHold();
     }, { passive: false });
-    sosButton.addEventListener('touchend', cancelSOSHold);
-    sosButton.addEventListener('touchcancel', cancelSOSHold);
 
-    // Click handler to open modal (only if not holding)
+    sosButton.addEventListener('touchend', () => {
+        cancelSOSHold();
+        const wasTap = Date.now() - touchStartTime < SOS_TAP_DURATION;
+        if (wasTap && !isSOSActive && !sosHoldTimer) {
+            openSOSModal('alerts');
+        }
+        touchStartTime = 0;
+    });
+    sosButton.addEventListener('touchcancel', () => {
+        cancelSOSHold();
+        touchStartTime = 0;
+    });
+
+    // Click handler to open modal (desktop quick click; only if not holding)
     sosButton.addEventListener('click', () => {
         if (!isSOSActive && !sosHoldTimer) {
             openSOSModal('alerts');
@@ -57,9 +80,12 @@ function startSOSHold() {
     if (sosHoldTimer) return;
 
     const sosButton = document.getElementById('sos-btn');
-    sosButton.classList.add('holding');
+    if (sosButton) {
+        sosButton.classList.add('holding');
+    }
 
     sosHoldTimer = setTimeout(() => {
+        sosHoldTimer = null;
         triggerSOS();
     }, SOS_HOLD_DURATION);
 
@@ -82,77 +108,132 @@ function cancelSOSHold() {
 }
 
 
+/**
+ * Resolve the best available position for an SOS.
+ * An emergency alert must never be blocked by GPS problems, so we walk a
+ * fallback chain: fresh high-accuracy fix -> recently cached fix -> last
+ * position this device shared on the map -> alert without location.
+ */
+async function resolveSOSLocation() {
+    const attempts = [
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+        { enableHighAccuracy: false, timeout: 4000, maximumAge: 5 * 60 * 1000 }
+    ];
+
+    for (const options of attempts) {
+        if (!('geolocation' in navigator)) break;
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, options);
+            });
+            if (isValidLatLng(position.coords.latitude, position.coords.longitude)) {
+                return {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: Number(position.coords.accuracy) || 0,
+                    locationAvailable: true
+                };
+            }
+        } catch (error) {
+            console.warn('[SOS] Location attempt failed:', error && error.message ? error.message : error);
+        }
+    }
+
+    // Fall back to the last position we shared on the map (our own marker)
+    try {
+        const selfMarker = markers[socket.id];
+        if (selfMarker && typeof selfMarker.getLatLng === 'function') {
+            const ll = selfMarker.getLatLng();
+            if (isValidLatLng(ll.lat, ll.lng)) {
+                return { latitude: ll.lat, longitude: ll.lng, accuracy: 0, locationAvailable: true };
+            }
+        }
+    } catch (error) {
+        console.warn('[SOS] Could not read last known position:', error);
+    }
+
+    // No usable position - still send the alert so people know there is an emergency
+    return { latitude: 0, longitude: 0, accuracy: 0, locationAvailable: false };
+}
+
+
 async function triggerSOS() {
     isSOSActive = true;
     sosHoldTimer = null;
 
     const sosButton = document.getElementById('sos-btn');
-    sosButton.classList.remove('holding');
-    sosButton.classList.add('triggered');
+    if (sosButton) {
+        sosButton.classList.remove('holding');
+        sosButton.classList.add('triggered');
+    }
 
     // Vibrate pattern (mobile)
     if (navigator.vibrate) {
         navigator.vibrate([200, 100, 200, 100, 200]);
     }
 
-    // Get current location and device info
+    // Reset the button state after 5 seconds no matter what happens below
+    const resetTimeout = setTimeout(() => {
+        isSOSActive = false;
+        if (sosButton) sosButton.classList.remove('triggered');
+    }, 5000);
+
     try {
-        const position = await getCurrentPosition();
-        const deviceInfo = await getDeviceInfo();
+        const [location, deviceInfo] = await Promise.all([
+            resolveSOSLocation(),
+            getDeviceInfo().catch(() => ({}))
+        ]);
 
         const sosData = {
-            sender: localStorage.getItem('userName') || getDeviceName(),
+            sender: getUserName() || getDeviceName(),
             location: {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy
+                latitude: location.latitude,
+                longitude: location.longitude,
+                accuracy: location.accuracy
             },
-            deviceInfo: {
-                ...deviceInfo,
-                userAgent: navigator.userAgent,
-                screenSize: `${screen.width}x${screen.height}`,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-            },
-            ipInfo: { ip: 'Fetching...' }, // Placeholder for local trigger
+            locationAvailable: location.locationAvailable,
+            // The server whitelists deviceInfo keys; keep the payload lean
+            deviceInfo: deviceInfo || {},
+            // Our public IP is only known to the server - filled in via the emit ack
+            ipInfo: { ip: IP_PENDING },
             timestamp: Date.now(),
             message: 'Emergency SOS Alert!'
         };
 
-        // Emit SOS to all users
-        socket.emit('sos-alert', sosData);
+        const localEntry = { ...sosData, isOwn: true };
+
+        // Emit SOS to all users in the room. The ack carries our public IP so
+        // our own alert card can show real data instead of a placeholder.
+        socket.emit('sos-alert', sosData, (response) => {
+            if (response && response.success && response.ip) {
+                localEntry.ipInfo = { ip: String(response.ip) };
+                persistAndRender();
+                enrichIpInfo(localEntry);
+            } else if (response && response.error) {
+                localEntry.ipInfo = { ip: 'Unknown' };
+                persistAndRender();
+                addNotification(`⚠️ SOS not delivered: ${response.error}`);
+            }
+        });
 
         // Add to local notifications
-        addNotification('⚠️ SOS sent! All users have been alerted.');
+        addNotification(location.locationAvailable
+            ? '⚠️ SOS sent! All users have been alerted.'
+            : '⚠️ SOS sent (without GPS location). All users have been alerted.');
 
         // Add to local SOS list
-        addSOSToList({ ...sosData, isOwn: true });
+        await addSOSToList(localEntry);
 
         // Open modal to show confirmation
         openSOSModal('alerts');
 
     } catch (error) {
-        console.error('[SOS] Error getting location:', error);
-        addNotification('❌ SOS failed - Could not get location');
-        sosButton.classList.remove('triggered');
+        console.error('[SOS] Error triggering SOS:', error);
+        addNotification('❌ SOS failed - unexpected error');
+        clearTimeout(resetTimeout);
         isSOSActive = false;
+        if (sosButton) sosButton.classList.remove('triggered');
     }
-
-    // Reset after 5 seconds
-    setTimeout(() => {
-        isSOSActive = false;
-        sosButton.classList.remove('triggered');
-    }, 5000);
-}
-
-
-function getCurrentPosition() {
-    return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
-        });
-    });
 }
 
 
@@ -188,8 +269,11 @@ function setupSOSModal() {
         let modalHoldTimer = null;
 
         const startModalHold = () => {
+            if (modalHoldTimer) return;
             triggerBtn.classList.add('holding');
             modalHoldTimer = setTimeout(() => {
+                modalHoldTimer = null;
+                triggerBtn.classList.remove('holding');
                 closeSOSModal();
                 triggerSOS();
             }, SOS_HOLD_DURATION);
@@ -215,6 +299,7 @@ function setupSOSModal() {
             startModalHold();
         }, { passive: false });
         triggerBtn.addEventListener('touchend', cancelModalHold);
+        triggerBtn.addEventListener('touchcancel', cancelModalHold);
     }
 
     // Escape key to close
@@ -257,14 +342,60 @@ function closeSOSModal() {
 }
 
 
-async function addSOSToList(sosData) {
-    // Ensure ipInfo exists
-    if (!sosData.ipInfo) sosData.ipInfo = { ip: 'Unknown' };
+/**
+ * Format an alert timestamp for the list: time-of-day for today,
+ * "Mon D, HH:MM" for older entries, and a safe label for invalid values.
+ */
+function formatTime(timestamp) {
+    const date = new Date(Number(timestamp));
+    if (!Number.isFinite(date.getTime())) return 'Unknown time';
 
-    // Fetch IP geolocation if not already present
-    if (!sosData.ipInfo.city && sosData.ipInfo.ip && sosData.ipInfo.ip !== 'Unknown' && sosData.ipInfo.ip !== 'Fetching...') {
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const isToday = date.toDateString() === new Date().toDateString();
+    if (isToday) return time;
+
+    const day = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return `${day}, ${time}`;
+}
+
+/**
+ * Keep the badge on the "SOS Alerts" tab in sync with the list.
+ * Hidden while there are no alerts.
+ */
+function updateSOSCount() {
+    const badge = document.getElementById('sos-count');
+    if (!badge) return;
+
+    const count = sosAlerts.length;
+    badge.textContent = count > 99 ? '99+' : String(count);
+    badge.classList.toggle('hidden', count === 0);
+}
+
+/** Save + re-render + badge in one step (keeps every mutation path consistent). */
+function persistAndRender() {
+    saveSOSToStorage();
+    renderSOSAlerts();
+    updateSOSCount();
+}
+
+async function addSOSToList(sosData) {
+    if (!sosData || typeof sosData !== 'object') return;
+
+    // Ensure ipInfo exists
+    if (!sosData.ipInfo || typeof sosData.ipInfo !== 'object') {
+        sosData.ipInfo = { ip: 'Unknown' };
+    }
+    if (!Number.isFinite(Number(sosData.timestamp))) {
+        sosData.timestamp = Date.now();
+    }
+    sosData.isOwn = Boolean(sosData.isOwn);
+
+    // Fetch IP geolocation for remote alerts that carry a real IP.
+    // Own/pending/unknown placeholders are skipped (ack fills ours in later).
+    const ip = sosData.ipInfo.ip;
+    if (!sosData.ipInfo.city && typeof ip === 'string' && ip && !IP_LOOKUP_SKIP.has(ip)) {
         try {
-            const geoData = await fetchIPGeolocation(sosData.ipInfo.ip);
+            const geoData = await fetchIPGeolocation(ip);
             sosData.ipInfo = { ...sosData.ipInfo, ...geoData };
         } catch (error) {
             console.log('[SOS] Could not fetch IP geolocation:', error);
@@ -273,9 +404,21 @@ async function addSOSToList(sosData) {
 
     sosAlerts.unshift(sosData);
     if (sosAlerts.length > MAX_SOS_ALERTS) sosAlerts.pop();
-    saveSOSToStorage();
-    renderSOSAlerts();
-    updateSOSCount();
+    persistAndRender();
+}
+
+/** Enrich our own alert with IP geolocation once the server ack provided the IP. */
+async function enrichIpInfo(entry) {
+    const ip = entry && entry.ipInfo && entry.ipInfo.ip;
+    if (!ip || IP_LOOKUP_SKIP.has(ip)) return;
+
+    try {
+        const geoData = await fetchIPGeolocation(ip);
+        entry.ipInfo = { ...entry.ipInfo, ...geoData };
+    } catch (error) {
+        console.log('[SOS] Could not fetch IP geolocation:', error);
+    }
+    persistAndRender();
 }
 
 async function fetchIPGeolocation(ip) {
@@ -316,6 +459,7 @@ function renderSOSAlerts() {
         const accuracy = Number(sos?.location?.accuracy) || 0;
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''; // Skip malformed entries
 
+        const locationAvailable = sos.locationAvailable !== false;
         const safeSender = escapeHtml(sos.sender || 'Unknown');
         const safeIp = escapeHtml(sos.ipInfo?.ip || 'Unknown');
         const safePlatform = escapeHtml(sos.deviceInfo?.deviceType || sos.deviceInfo?.os || 'Unknown');
@@ -333,12 +477,14 @@ function renderSOSAlerts() {
             <div class="sos-alert-details">
                 <div class="sos-detail">
                     <span class="detail-label">📍 Location:</span>
-                    <span class="detail-value">${lat.toFixed(6)}, ${lng.toFixed(6)}</span>
+                    <span class="detail-value">${locationAvailable ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : 'Unavailable'}</span>
                 </div>
+                ${locationAvailable ? `
                 <div class="sos-detail">
                     <span class="detail-label">🎯 Accuracy:</span>
                     <span class="detail-value">${accuracy.toFixed(0)}m</span>
                 </div>
+                ` : ''}
                 <div class="sos-detail">
                     <span class="detail-label">🌐 IP Address:</span>
                     <span class="detail-value">${safeIp}</span>
@@ -361,9 +507,11 @@ function renderSOSAlerts() {
                 ` : ''}
             </div>
             <div class="sos-alert-actions">
+                ${locationAvailable ? `
                 <button class="sos-action-btn view-map">
                     <span>🗺️</span> View on Map
                 </button>
+                ` : ''}
                 <button class="sos-action-btn dismiss">
                     <span>✓</span> Dismiss
                 </button>
@@ -400,7 +548,8 @@ function setupSOSListActions() {
 
 function viewSOSOnMap(index) {
     const sos = sosAlerts[index];
-    if (sos && isValidLatLng(sos.location?.latitude, sos.location?.longitude) && window.focusMapOnLocation) {
+    if (!sos || sos.locationAvailable === false) return;
+    if (isValidLatLng(sos.location?.latitude, sos.location?.longitude) && window.focusMapOnLocation) {
         window.focusMapOnLocation(sos.location.latitude, sos.location.longitude);
         closeSOSModal();
     }
@@ -412,9 +561,7 @@ function viewSOSOnMap(index) {
 function dismissSOS(index) {
     if (!Number.isInteger(index) || index < 0 || index >= sosAlerts.length) return;
     sosAlerts.splice(index, 1);
-    saveSOSToStorage();
-    renderSOSAlerts();
-    updateSOSCount();
+    persistAndRender();
 }
 
 /**
@@ -458,8 +605,9 @@ function playSOSSound() {
 }
 
 function initSOSSocketHandlers() {
-    socket.on('sos-alert', (data) => {
+    socket.on('sos-alert', async (data) => {
         console.log('[SOS] Received SOS alert:', data);
+        if (!data || typeof data !== 'object') return;
 
         // Play sound
         playSOSSound();
@@ -469,9 +617,6 @@ function initSOSSocketHandlers() {
             navigator.vibrate([500, 200, 500, 200, 500]);
         }
 
-        // Add to list
-        addSOSToList({ ...data, isOwn: false });
-
         // Activate overlay
         const overlay = document.getElementById('sos-overlay');
         if (overlay) {
@@ -480,7 +625,7 @@ function initSOSSocketHandlers() {
         }
 
         // Show notification
-        addNotification(`🚨 SOS from ${data.sender}!`);
+        addNotification(`🚨 SOS from ${data.sender || 'a user'}!`);
 
         // Show browser notification if permitted
         showBrowserNotification(data);
@@ -492,6 +637,13 @@ function initSOSSocketHandlers() {
             setTimeout(() => sosButton.classList.remove('incoming'), 3000);
         }
 
+        // Add to list before opening the modal so the alert is visible immediately
+        try {
+            await addSOSToList({ ...data, isOwn: false });
+        } catch (error) {
+            console.error('[SOS] Could not add alert to list:', error);
+        }
+
         // Auto-open modal
         openSOSModal('alerts');
     });
@@ -501,10 +653,16 @@ function initSOSSocketHandlers() {
 async function showBrowserNotification(sosData) {
     if (!('Notification' in window)) return;
 
+    const hasLocation = sosData.locationAvailable !== false &&
+        isValidLatLng(Number(sosData.location?.latitude), Number(sosData.location?.longitude));
+
     if (Notification.permission === 'granted') {
         try {
             new Notification('🚨 SOS Alert!', {
-                body: `Emergency from ${sosData.sender}\nLocation: ${Number(sosData.location?.latitude ?? 0).toFixed(4)}, ${Number(sosData.location?.longitude ?? 0).toFixed(4)}`,
+                body: `Emergency from ${sosData.sender || 'a user'}\n` +
+                    (hasLocation
+                        ? `Location: ${Number(sosData.location.latitude).toFixed(4)}, ${Number(sosData.location.longitude).toFixed(4)}`
+                        : 'Location unavailable'),
                 icon: '/assets/icons/icon.svg',
                 tag: 'sos-alert',
                 requireInteraction: true
@@ -548,6 +706,7 @@ function loadSOSFromStorage() {
             typeof sos.sender === 'string'
         ).slice(0, 20);
 
+        renderSOSAlerts();
         updateSOSCount();
     } catch (e) {
         console.log('[SOS] Could not load from storage');

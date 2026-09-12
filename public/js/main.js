@@ -54,8 +54,16 @@ window.addEventListener('profileUpdate', (e) => {
 });
 
 // Battery Optimization: Accelerometer logic
+let motionDetectionInitialized = false;
+
 function initMotionDetection() {
+    // The join callback also runs after every reconnect - without this guard
+    // each reconnect would stack another devicemotion listener (battery drain
+    // and duplicated interval restarts).
+    if (motionDetectionInitialized) return;
+
     if ('DeviceMotionEvent' in window) {
+        motionDetectionInitialized = true;
         window.addEventListener('devicemotion', (event) => {
             const acc = event.accelerationIncludingGravity;
             if (!acc || acc.x === null) return;

@@ -2,7 +2,25 @@
 
 ## Version Release
 
-### **Version 5.0.1 (Latest)** – **Security Hardening, Stability & Performance**
+### **Version 5.0.2 (Latest)** – **SOS Reliability & UI/UX Fixes**
+
+- **🆘 SOS Fixed (was completely broken):** `sos.js` called two functions that were never defined (`formatTime`, `updateSOSCount`). The resulting `ReferenceError` aborted the send flow, so the sender saw "SOS failed" even though the alert had already been broadcast, and on the next page load the crash happened during `initSOS()`, which prevented the room join, socket handlers, controls, and battery monitor from ever initializing. Both helpers are now implemented (relative/absolute alert times, live count badge on the SOS tab).
+- **🛰️ SOS Never Blocked by GPS:** Triggering an SOS previously failed outright if `getCurrentPosition` was denied or timed out. It now walks a fallback chain - high-accuracy fix, cached fix (5 min), last position shared on the map, then send-without-location - so an emergency alert always goes out. Alerts sent without a fix are flagged (`locationAvailable: false`) and render "Location: Unavailable" with the map button hidden instead of pointing at null island.
+- **🌐 Real IP on Your Own SOS:** Own alerts showed a permanent "Fetching..." placeholder. The server now acks `sos-alert` with the IP it observes, and the client patches and geolocates its own alert card. Invalid or rate-limited alerts get an error ack and a visible notification.
+- **📱 SOS on Touch Devices:** `preventDefault()` on touchstart suppressed the emulated click, so a tap could never open the alerts modal on mobile - taps are now detected explicitly. Hold buttons also got `touch-action: none` and selection suppression so a long press can't scroll or highlight, and the progress fill now snaps back on release instead of draining over 2s.
+- **🐞 SOS Modal Layout:** The modal is a flex column, so the alert list scrolls inside the dialog on short screens instead of being clipped by `overflow: hidden`. Added `env(safe-area-inset-*)` padding for notched devices and visible focus rings for keyboard users.
+- **📍 SOS Button Position:** The mobile rule set `right: 15px` while the base `left: 60px` still applied; with all three of left/right/width set, `right` is ignored, so the button never moved. `left: auto` now anchors it correctly.
+- **🔋 Battery Alerts Silent Crash:** `batteryMonitor.js` called `playTone` without importing it, throwing on every low-battery alert; now imported from `sounds.js`, and device names in the battery panel are HTML-escaped.
+- **🎙️ Mic Button Rejoin:** The long-press-to-leave flag (`suppressNextMicClick`) was declared but never used, so the trailing click instantly rejoined the call you just left. Now wired up for both mouse and touch.
+- **👤 Profile Editor Dead Button:** `cloneNode` copied the `disabled` state set after the first "Continue", so the Edit Profile save button never responded. The clone is re-enabled.
+- **🔁 Reconnect Cleanup:** Removed a dead `socket.on('reconnect')` handler (Manager-level event in socket.io-client v4, never re-emitted on the Socket) that duplicated the room re-join already handled by `connect`. Motion detection is now guarded so reconnects no longer stack extra `devicemotion` listeners. `connect_error` surfaces a notification instead of failing silently.
+- **🎨 Theme & Responsive UI:** The sidebar used hardcoded white glass, so dark mode never applied to it; it now reads `--sidebar-bg`/`--glass-border`, and the theme palettes define the full glass/surface/background variable set. Device list rows and names use theme variables (the hover state was white-on-white and invisible), the missing `.device-icon.linux-pc` icon was added, and the mobile notification panel no longer stretches full-height (it set `bottom` while the base `top` was still in effect).
+- **📦 PWA Cache:** Precached the device popup/marker art (`*-device-log.png`, `windows-log.gif`, `unknown-log.gif`) that popups request offline, and bumped cache versions to v4 so clients pick up these fixes.
+- **🧪 Tests:** Added coverage for the SOS ack (success + server-observed IP), `locationAvailable` relay semantics, and the error ack for a location-less payload.
+
+---
+
+### **Version 5.0.1** – **Security Hardening, Stability & Performance**
 
 - **🔒 XSS Fix:** All remote device info (OS, browser, connection, IP, etc.) is now whitelisted and sanitized on the server and HTML-escaped on the client before rendering in popups, device list, and SOS alerts.
 - **🚦 Socket Hardening:** WebRTC offer/answer/ICE payloads are validated before relay, per-socket rate limits protect chat/SOS/location events from floods, and socket messages are capped at 1 MB.

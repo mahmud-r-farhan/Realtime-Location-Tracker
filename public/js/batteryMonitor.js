@@ -1,4 +1,6 @@
 import { addNotification } from './notification.js';
+import { playTone } from './sounds.js';
+import { escapeHtml } from './utils.js';
 import { socket } from './socket.js';
 
 // Battery thresholds
@@ -185,7 +187,7 @@ function updateBatteryPanel() {
     batteryList.innerHTML = batteries.map(device => `
         <div class="battery-item ${getBatteryClass(device.level, device.charging)}">
             <div class="battery-device">
-                <span class="device-name">${device.deviceName}</span>
+                <span class="device-name">${escapeHtml(device.deviceName)}</span>
                 <span class="battery-time">${formatTimeSince(device.lastUpdate)}</span>
             </div>
             <div class="battery-indicator">

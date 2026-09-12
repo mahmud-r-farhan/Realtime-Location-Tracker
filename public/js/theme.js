@@ -29,6 +29,11 @@ const themes = {
         '--sidebar-bg': 'rgba(255, 255, 255, 0.95)',
         '--panel-bg': 'rgba(255, 255, 255, 0.98)',
         '--notification-bg': 'rgba(255, 255, 255, 0.95)',
+        '--surface': 'rgba(255, 255, 255, 0.85)',
+        '--surface-alt': 'rgba(241, 243, 244, 0.8)',
+        '--glass-bg': 'rgba(255, 255, 255, 0.6)',
+        '--glass-border': 'rgba(255, 255, 255, 0.4)',
+        '--background': '#f0f2f5',
         '--fab-bg': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         '--gradient-start': '#667eea',
         '--gradient-end': '#764ba2'
@@ -59,6 +64,11 @@ const themes = {
         '--sidebar-bg': 'rgba(30, 41, 59, 0.98)',
         '--panel-bg': 'rgba(30, 41, 59, 0.98)',
         '--notification-bg': 'rgba(30, 41, 59, 0.95)',
+        '--surface': 'rgba(30, 41, 59, 0.92)',
+        '--surface-alt': 'rgba(15, 23, 42, 0.8)',
+        '--glass-bg': 'rgba(15, 23, 42, 0.6)',
+        '--glass-border': 'rgba(255, 255, 255, 0.08)',
+        '--background': '#020617',
         '--fab-bg': 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
         '--gradient-start': '#6366f1',
         '--gradient-end': '#8b5cf6'

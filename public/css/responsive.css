@@ -16,17 +16,23 @@
         right: 10px;
         bottom: 80px;
         height: 70vh;
+        max-height: calc(100vh - 100px);
         border-radius: 20px;
     }
 
+    /* Anchor the panel below the top controls.
+       The previous rule added bottom:10px while the base top:90px was still
+       in effect - with height:auto that stretches the panel the full screen
+       height on mobile. top/bottom must never be set together here. */
     #notification-panel {
-        width: calc(100% - 20px);
+        top: 84px;
+        bottom: auto;
         left: 10px;
-        bottom: 10px;
+        width: calc(100% - 20px);
     }
 
     #notification-panel.minimized {
-        width: 160px;
+        width: 170px;
     }
 
     .popup-content {
@@ -38,5 +44,31 @@
 @media (max-width: 480px) {
     #sidebar {
         width: 85%;
+    }
+
+    #chat-panel {
+        height: 65vh;
+    }
+
+    .popup-content h2 {
+        font-size: 1.25em;
+    }
+}
+
+/* Short screens (landscape phones): keep the welcome popup usable */
+@media (max-height: 480px) {
+    .popup-content {
+        padding: 20px;
+        max-height: 92vh;
+        overflow-y: auto;
+    }
+
+    .popup-content input {
+        padding: 10px;
+        margin-bottom: 14px;
+    }
+
+    .popup-buttons button {
+        padding: 10px 24px;
     }
 }

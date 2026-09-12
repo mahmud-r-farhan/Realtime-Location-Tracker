@@ -1,9 +1,9 @@
 // Service Worker for Realtime Location Tracker PWA
 // NOTE: bump the cache versions whenever precached assets change, so all
 // clients pick up the new files (old caches are purged on activation).
-const CACHE_NAME        = 'location-tracker-v3';
-const STATIC_CACHE_NAME = 'static-cache-v3';
-const DYNAMIC_CACHE_NAME= 'dynamic-cache-v3';
+const CACHE_NAME        = 'location-tracker-v4';
+const STATIC_CACHE_NAME = 'static-cache-v4';
+const DYNAMIC_CACHE_NAME= 'dynamic-cache-v4';
 
 // Assets to cache immediately on install - includes the full ES-module graph
 // (main.js imports every other module, so all of them are required offline).
@@ -46,9 +46,16 @@ const STATIC_ASSETS = [
     '/assets/android-log.png',
     '/assets/ios-log.png',
     '/assets/windows-log.png',
+    '/assets/windows-log.gif',
     '/assets/mac-log.png',
     '/assets/linux-log.png',
     '/assets/unknown-log.png',
+    '/assets/unknown-log.gif',
+    '/assets/android-device-log.png',
+    '/assets/ios-device-log.png',
+    '/assets/windows-pc-log.png',
+    '/assets/linux-pc-log.png',
+    '/assets/unknown-device-log.png',
     '/assets/microphone-muted-icon.png',
     '/assets/microphone-on-icon.png',
     '/assets/speaker-on-icon.png',

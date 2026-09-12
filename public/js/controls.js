@@ -233,8 +233,11 @@ function openProfileEditor() {
         continueBtn.removeEventListener('click', handleSave);
     };
 
-    // Remove previous listeners (cloning node is a dirty but effective reset)
+    // Remove previous listeners (cloning node is a dirty but effective reset).
+    // The clone copies the disabled state set by main.js after the first
+    // "Continue" - re-enable it or the Save button never responds.
     const newBtn = continueBtn.cloneNode(true);
+    newBtn.disabled = false;
     continueBtn.parentNode.replaceChild(newBtn, continueBtn);
     newBtn.addEventListener('click', handleSave);
 }
@@ -646,7 +649,9 @@ function addControlStyles() {
             position: fixed;
             top: 80px;
             right: 10px;
-            z-index: 45;
+            /* Above the notification panel (z 800) so the buttons stay
+               reachable while the activity log is expanded */
+            z-index: 850;
             flex-direction: column;
             gap: 8px;
         }

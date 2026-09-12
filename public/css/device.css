@@ -10,7 +10,8 @@
     align-items: center;
     margin-bottom: 15px;
     padding: 15px 10px;
-    background-color: #fff;
+    background-color: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, transparent);
     border-radius: 5px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     cursor: pointer;
@@ -18,7 +19,7 @@
 }
 
 #device-list li:hover {
-    background: var(--bg-primary);
+    background: var(--bg-tertiary, #f1f3f4);
     transform: translateY(-2px);
     box-shadow: var(--shadow-medium);
 }
@@ -36,12 +37,14 @@
 .device-name {
     font-size: 0.95rem;
     font-weight: 500;
-    color: black;
+    color: var(--text-primary, #000);
     flex-grow: 1;
+    overflow-wrap: anywhere;
 }
 
+/* Was color:white - invisible (white on white card). Use the accent color. */
 .device-name:hover {
-color: white;
+    color: var(--primary-color);
 }
 
 

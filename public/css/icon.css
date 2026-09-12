@@ -2,4 +2,5 @@
 .device-icon.ios-device { background-image: url('../assets/ios-log.png'); }
 .device-icon.windows-pc { background-image: url('../assets/windows-log.gif'); }
 .device-icon.mac { background-image: url('../assets/mac-log.png'); }
+.device-icon.linux-pc { background-image: url('../assets/linux-log.png'); }
 .device-icon.unknown-device { background-image: url('../assets/unknown-log.gif'); }
