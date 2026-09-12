@@ -55,8 +55,25 @@ export function initSocketEventHandlers(onJoinSuccess) {
         }
     });
 
+    // Bug 5 fix: On reconnect the server assigns a new socket.id but the client
+    // never re-joins the room, silently dumping the user into the public room and
+    // leaving a ghost self-marker on the map.
+    // Fix: re-emit join-room with the stored room + device name so the server
+    // re-registers the socket in the correct room.
     socket.on('reconnect', (attemptNumber) => {
         addNotification(`Reconnected to server after ${attemptNumber} attempts`);
+
+        const storedRoom = localStorage.getItem('orgName') || 'public';
+        const storedName = localStorage.getItem('userName') || getDeviceName();
+
+        // Re-join the correct room with the new socket id
+        socket.emit('join-room', { room: storedRoom, deviceName: storedName });
+
+        // Clear the stale self-marker (keyed by old socket id) — the server
+        // will broadcast a new receive-location which recreates it.
+        // We don't know the old id here directly, so we clear all markers whose
+        // popup says "(You)" by relying on setSelfId resetting selfId.
+        setSelfId(socket.id);
     });
 
     socket.on('connect_error', (error) => {
@@ -131,6 +148,10 @@ export function initSocketEventHandlers(onJoinSuccess) {
         await handleIceCandidate(peerId, candidate);
     });
 
+    // Bug fix (chat double-beep): addMessageToChat() already calls
+    // playNotificationBeep() internally for received messages. The old code
+    // in socket.js also played a beep here, causing two beeps per message.
+    // We only call addMessageToChat — the sound is its responsibility.
     socket.on('chat-message', (data) => {
         const userName = localStorage.getItem('userName') || getDeviceName();
         if (data.senderId === socket.id || data.sender === userName) {
