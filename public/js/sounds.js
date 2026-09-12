@@ -12,9 +12,18 @@ function initAudioContext() {
 }
 
 /**
- * Play notification beep
+ * Play a single synthesized tone.
+ * Reuses one shared AudioContext - browsers cap the number of live contexts
+ * (~6), so creating one per alert eventually silences the app permanently.
+ *
+ * @param {Object} options
+ * @param {number} options.frequency  Start frequency in Hz
+ * @param {number} [options.endFrequency] Optional ramp target in Hz
+ * @param {string} [options.type]     Oscillator type (sine, square, ...)
+ * @param {number} [options.duration] Seconds
+ * @param {number} [options.volume]   Peak gain (0-1)
  */
-export function playNotificationBeep() {
+export function playTone({ frequency, endFrequency, type = 'sine', duration = 0.15, volume = 0.2 }) {
     try {
         const ctx = initAudioContext();
         const now = ctx.currentTime;
@@ -25,46 +34,56 @@ export function playNotificationBeep() {
         oscillator.connect(gainNode);
         gainNode.connect(ctx.destination);
 
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(800, now);
-        oscillator.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, now);
+        if (endFrequency) {
+            oscillator.frequency.exponentialRampToValueAtTime(endFrequency, now + duration);
+        }
 
-        gainNode.gain.setValueAtTime(0.2, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        gainNode.gain.setValueAtTime(volume, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
 
         oscillator.start(now);
-        oscillator.stop(now + 0.15);
-
-        console.log('[Sound] Notification beep played');
+        oscillator.stop(now + duration);
     } catch (error) {
-        console.warn('[Sound] Could not play notification beep:', error);
+        console.warn('[Sound] Could not play tone:', error);
     }
 }
 
 /**
- * Play success sound
+ * Play notification beep
+ */
+export function playNotificationBeep() {
+    playTone({ frequency: 800, endFrequency: 400, type: 'sine', duration: 0.15, volume: 0.2 });
+}
+
+/**
+ * Play success sound (C5-E5-G5 arpeggio)
  */
 export function playSuccessSound() {
     try {
         const ctx = initAudioContext();
         const now = ctx.currentTime;
 
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
+        const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+        notes.forEach((frequency, index) => {
+            const start = now + index * 0.1;
 
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
 
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(523.25, now); // C5
-        oscillator.frequency.setValueAtTime(659.25, now + 0.1); // E5
-        oscillator.frequency.setValueAtTime(783.99, now + 0.2); // G5
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
 
-        gainNode.gain.setValueAtTime(0.2, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, start);
 
-        oscillator.start(now);
-        oscillator.stop(now + 0.3);
+            gainNode.gain.setValueAtTime(0.2, start);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, start + 0.3);
+
+            oscillator.start(start);
+            oscillator.stop(start + 0.3);
+        });
     } catch (error) {
         console.warn('[Sound] Could not play success sound:', error);
     }
@@ -74,31 +93,11 @@ export function playSuccessSound() {
  * Play error sound
  */
 export function playErrorSound() {
-    try {
-        const ctx = initAudioContext();
-        const now = ctx.currentTime;
-
-        const oscillator = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(ctx.destination);
-
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(150, now);
-
-        gainNode.gain.setValueAtTime(0.15, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-
-        oscillator.start(now);
-        oscillator.stop(now + 0.3);
-    } catch (error) {
-        console.warn('[Sound] Could not play error sound:', error);
-    }
+    playTone({ frequency: 150, type: 'square', duration: 0.3, volume: 0.15 });
 }
 
 /**
- * Play call ringing sound
+ * Play call ringing sound (dual-tone ring, two pulses)
  */
 export function playCallRing() {
     try {
@@ -119,13 +118,14 @@ export function playCallRing() {
             osc1.frequency.value = 440; // A4
             osc2.frequency.value = 480;
 
-            gain.gain.setValueAtTime(0.1, now + i * 0.8);
-            gain.gain.setValueAtTime(0, now + i * 0.8 + 0.4);
+            const start = now + i * 0.8;
+            gain.gain.setValueAtTime(0.1, start);
+            gain.gain.setValueAtTime(0, start + 0.4);
 
-            osc1.start(now + i * 0.8);
-            osc1.stop(now + i * 0.8 + 0.4);
-            osc2.start(now + i * 0.8);
-            osc2.stop(now + i * 0.8 + 0.4);
+            osc1.start(start);
+            osc1.stop(start + 0.4);
+            osc2.start(start);
+            osc2.stop(start + 0.4);
         }
     } catch (error) {
         console.warn('[Sound] Could not play call ring:', error);

@@ -2,7 +2,23 @@
 
 ## Version Release
 
-### **Version 4.2 (Latest)** – **UI Overhaul & Broadcast Features**
+### **Version 5.0.1 (Latest)** – **Security Hardening, Stability & Performance**
+
+- **🔒 XSS Fix:** All remote device info (OS, browser, connection, IP, etc.) is now whitelisted and sanitized on the server and HTML-escaped on the client before rendering in popups, device list, and SOS alerts.
+- **🚦 Socket Hardening:** WebRTC offer/answer/ICE payloads are validated before relay, per-socket rate limits protect chat/SOS/location events from floods, and socket messages are capped at 1 MB.
+- **🧪 Test Suite Fixed:** Socket tests now authenticate with the session cookie (they previously hung forever) and new tests cover session forging, payload sanitization, rate limiting, and room switching.
+- **📞 WebRTC Fixes:** Offer glare is resolved with polite-peer rollback, transient ICE "disconnected" states no longer kill calls, and the long-press leave-call button no longer instantly rejoins.
+- **🔋 Battery Alerts:** Reuse a shared AudioContext (browsers cap ~6 contexts; alerts previously went permanently silent after a few alerts).
+- **📡 Reconnect Recovery:** Clients re-join their organization/fleet room automatically after reconnecting instead of silently falling back to the public room.
+- **🌍 Room Switching:** Moving between rooms immediately updates the device list and user count in the old room.
+- **⚡ Performance:** Device info is cached (30s) instead of rebuilt every location ping, GPS jitter tolerance avoids redundant sends, idle detection is time-based, and map popups are updated in place.
+- **🌐 PWA Fixes:** The service worker now precaches the full ES-module graph (offline launches previously broke), dead external CDN precache entries were removed, map tile caching covers all basemap providers, and runtime caches are trimmed.
+- **🚀 Server Fixes:** Production rate limiting no longer counts static assets (page reloads could trigger 429s), `sw.js`/`manifest.json` are served `no-cache`, graceful shutdown closes Socket.IO connections (previously hung), and SIGINT/unhandled rejections are handled.
+- **🐳 Docker:** Fixed the case-mismatch between `docker-compose.yml` and the `dockerfile` that broke builds on Linux, health check now targets `/health`, and the image version label matches the package version.
+
+---
+
+### **Version 4.2** – **UI Overhaul & Broadcast Features**
 
 - **🎨 Modern "Tech Blue" Theme:** A complete visual redesign with vibrant blue aesthetics, modern typography, and glassmorphism effects.
 - **📢 Broadcast Call Request:** A "Megaphone" feature allows users to instantly invite everyone in the room to join a voice call.

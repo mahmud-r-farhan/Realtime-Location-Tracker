@@ -8,6 +8,8 @@ let localStream = null;
 let audioEnabled = false;
 let speakerEnabled = true;
 let isInCall = false;
+// Set when a long-press leave fires, so the trailing click is ignored once.
+let suppressNextMicClick = false;
 
 // Store peer connections and audio elements
 export const peerConnections = {};
@@ -16,7 +18,6 @@ const pendingCandidates = {};
 
 // Create UI elements for call status
 let callStatusElement = null;
-let activeUsersElement = null;
 
 export function createPeerConnection(peerId) {
     // Close existing connection if any
@@ -48,13 +49,15 @@ export function createPeerConnection(peerId) {
         }
     };
 
-    // Monitor ICE connection state
+    // Monitor ICE connection state.
+    // NOTE: 'disconnected' is often transient (network blip) and usually
+    // recovers on its own - tearing down the call on it was far too eager.
     pc.oniceconnectionstatechange = () => {
         console.log(`ICE state for ${peerId}: ${pc.iceConnectionState}`);
-        if (['failed', 'disconnected', 'closed'].includes(pc.iceConnectionState)) {
+        if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
             handlePeerDisconnected(peerId);
-        } else if (pc.iceConnectionState === 'connected') {
-            addNotification(`Audio connected with a peer`);
+        } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+            addNotification('Audio connected with a peer');
             updateCallUI();
         }
     };
@@ -69,6 +72,17 @@ export function createPeerConnection(peerId) {
 
     peerConnections[peerId] = pc;
     return pc;
+}
+
+/**
+ * Perfect negotiation support: when both peers create offers simultaneously
+ * (glare), the "polite" peer yields by rolling back and accepting the remote
+ * offer; the impolite peer ignores the incoming offer and lets its own
+ * proceed. setRemoteDescription(offer) while in 'have-local-offer' performs
+ * the implicit rollback per the WebRTC spec.
+ */
+function isPolitePeer(peerId) {
+    return (socket.id || '') < String(peerId);
 }
 
 /**
@@ -148,32 +162,60 @@ function handlePeerDisconnected(peerId) {
 }
 
 /**
+ * Add local tracks to a peer connection (skipping already-attached ones)
+ */
+function attachLocalTracks(pc) {
+    if (!localStream || !audioEnabled) return;
+    localStream.getTracks().forEach(track => {
+        const alreadyAttached = pc.getSenders().some(sender => sender.track === track);
+        if (!alreadyAttached) {
+            pc.addTrack(track, localStream);
+        }
+    });
+}
+
+/**
+ * Process ICE candidates that arrived before the remote description was set
+ */
+async function processPendingCandidates(pc, peerId) {
+    const queued = pendingCandidates[peerId];
+    if (!queued || queued.length === 0) return;
+
+    for (const candidate of queued) {
+        try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+            console.error('Error adding queued ICE candidate:', e);
+        }
+    }
+    pendingCandidates[peerId] = [];
+}
+
+/**
  * Handle incoming offer
  */
 export async function handleOffer(peerId, description) {
     console.log(`Handling offer from ${peerId}`);
-    playCallRing(); // Play ring sound on incoming offer
 
     let pc = peerConnections[peerId];
-    if (!pc) {
+    const isNewConnection = !pc;
+
+    // Glare: we both created offers. The polite peer rolls back and accepts;
+    // the impolite peer keeps its own offer and drops this one.
+    if (pc && pc.signalingState === 'have-local-offer' && !isPolitePeer(peerId)) {
+        console.warn(`Offer glare with ${peerId}; ignoring as impolite peer`);
+        return;
+    }
+
+    if (isNewConnection) {
+        playCallRing(); // Ring only for genuinely new incoming calls
         pc = createPeerConnection(peerId);
     }
 
     try {
-        // Set remote description
         await pc.setRemoteDescription(new RTCSessionDescription(description));
+        attachLocalTracks(pc);
 
-        // Add local tracks if we have them
-        if (localStream && audioEnabled) {
-            localStream.getTracks().forEach(track => {
-                const senders = pc.getSenders();
-                if (!senders.find(sender => sender.track === track)) {
-                    pc.addTrack(track, localStream);
-                }
-            });
-        }
-
-        // Create and send answer
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
@@ -182,14 +224,7 @@ export async function handleOffer(peerId, description) {
             description: pc.localDescription
         });
 
-        // Process any pending ICE candidates
-        if (pendingCandidates[peerId]) {
-            for (const candidate of pendingCandidates[peerId]) {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            }
-            pendingCandidates[peerId] = [];
-        }
-
+        await processPendingCandidates(pc, peerId);
     } catch (error) {
         console.error("Error handling offer:", error);
         addNotification('Failed to establish audio connection');
@@ -213,15 +248,7 @@ export async function handleAnswer(peerId, description) {
         }
 
         await pc.setRemoteDescription(new RTCSessionDescription(description));
-
-        // Process any pending ICE candidates
-        if (pendingCandidates[peerId]) {
-            for (const candidate of pendingCandidates[peerId]) {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            }
-            pendingCandidates[peerId] = [];
-        }
-
+        await processPendingCandidates(pc, peerId);
     } catch (error) {
         console.error("Error handling answer:", error);
     }
@@ -231,6 +258,8 @@ export async function handleAnswer(peerId, description) {
  * Handle incoming ICE candidate
  */
 export async function handleIceCandidate(peerId, candidate) {
+    if (!peerId || !candidate) return;
+
     const pc = peerConnections[peerId];
 
     if (!pc || !pc.remoteDescription) {
@@ -238,7 +267,10 @@ export async function handleIceCandidate(peerId, candidate) {
         if (!pendingCandidates[peerId]) {
             pendingCandidates[peerId] = [];
         }
-        pendingCandidates[peerId].push(candidate);
+        // Bound the queue so a misbehaving peer cannot grow it forever
+        if (pendingCandidates[peerId].length < 100) {
+            pendingCandidates[peerId].push(candidate);
+        }
         return;
     }
 
@@ -277,13 +309,7 @@ async function initiateCall(peerId) {
     console.log(`Initiating call to ${peerId}`);
 
     const pc = createPeerConnection(peerId);
-
-    // Add local tracks
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            pc.addTrack(track, localStream);
-        });
-    }
+    attachLocalTracks(pc);
 
     try {
         const offer = await pc.createOffer({
@@ -298,12 +324,14 @@ async function initiateCall(peerId) {
         });
     } catch (error) {
         console.error('Error creating offer:', error);
+        closePeerConnection(peerId);
         addNotification('Failed to initiate call');
     }
 }
 
 /**
- * Join the audio call
+ * Join the audio call.
+ * @returns {Promise<boolean>} true when the call was joined successfully
  */
 async function joinCall() {
     try {
@@ -327,9 +355,11 @@ async function joinCall() {
         emitJoinAudio();
 
         addNotification('Joined audio call - waiting for peers...');
+        return true;
 
     } catch (err) {
         console.error('Error accessing microphone:', err);
+        localStream = null;
 
         if (err.name === 'NotAllowedError') {
             addNotification('Microphone access denied. Please enable it in browser settings.');
@@ -338,6 +368,8 @@ async function joinCall() {
         } else {
             addNotification('Failed to access microphone.');
         }
+        updateCallUI();
+        return false;
     }
 }
 
@@ -345,6 +377,8 @@ async function joinCall() {
  * Leave the audio call
  */
 function leaveCall() {
+    if (!isInCall && !localStream) return;
+
     // Stop local stream
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -373,28 +407,25 @@ function leaveCall() {
  * Toggle microphone mute/unmute while in call
  */
 function toggleMic() {
+    // A long-press just triggered leaveCall; the synthetic click that follows
+    // must not immediately rejoin the call.
+    if (suppressNextMicClick) {
+        suppressNextMicClick = false;
+        return;
+    }
+
     if (!isInCall) {
         // Not in call, join call
         joinCall();
-    } else {
-        // Already in call
-        if (audioEnabled && localStream) {
-            // Mute (stop tracks but stay in call)
-            localStream.getAudioTracks().forEach(track => {
-                track.enabled = false;
-            });
-            audioEnabled = false;
-            updateMicButton(false);
-            addNotification('Microphone muted');
-        } else if (!audioEnabled && localStream) {
-            // Unmute
-            localStream.getAudioTracks().forEach(track => {
-                track.enabled = true;
-            });
-            audioEnabled = true;
-            updateMicButton(true);
-            addNotification('Microphone unmuted');
-        }
+    } else if (localStream) {
+        // Toggle mute (stay in the call)
+        const mute = audioEnabled;
+        localStream.getAudioTracks().forEach(track => {
+            track.enabled = !mute;
+        });
+        audioEnabled = !mute;
+        updateMicButton(audioEnabled);
+        addNotification(audioEnabled ? 'Microphone unmuted' : 'Microphone muted');
     }
 }
 
@@ -413,12 +444,11 @@ function updateMicButton(enabled) {
 }
 
 /**
- * Toggle speaker on/off
+ * Toggle speaker mute
  */
 function toggleSpeaker() {
     speakerEnabled = !speakerEnabled;
 
-    // Update all remote audio elements
     Object.values(remoteAudioElements).forEach(audio => {
         audio.muted = !speakerEnabled;
     });
@@ -436,11 +466,33 @@ function toggleSpeaker() {
 }
 
 /**
+ * Sync the join/leave call button with the actual call state.
+ * The old code set button colors optimistically BEFORE getUserMedia
+ * resolved, leaving a red "leave" button after mic-denial failures.
+ */
+function updateCallButton() {
+    const callBtn = document.getElementById('call-btn');
+    if (!callBtn) return;
+
+    if (isInCall) {
+        callBtn.style.background = 'rgba(244, 67, 54, 0.6)'; // Red
+        callBtn.innerHTML = `<i class="fas fa-phone-slash"></i>`;
+        callBtn.title = 'Leave Audio Call';
+    } else {
+        callBtn.style.background = 'rgba(76, 175, 80, 0.6)'; // Green
+        callBtn.innerHTML = `<i class="fas fa-phone"></i>`;
+        callBtn.title = 'Join/Leave Audio Call';
+    }
+}
+
+/**
  * Create and update call status UI
  */
 function updateCallUI() {
     const audioControls = document.getElementById('audio-controls');
     if (!audioControls) return;
+
+    updateCallButton();
 
     // Create or update call status element
     if (!callStatusElement) {
@@ -450,7 +502,6 @@ function updateCallUI() {
         audioControls.parentNode.insertBefore(callStatusElement, audioControls);
     }
 
-    const peerCount = Object.keys(peerConnections).length;
     const connectedPeers = Object.values(peerConnections).filter(
         pc => pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed'
     ).length;
@@ -473,7 +524,7 @@ function updateCallUI() {
 }
 
 export function handleUserConnectedToAudio(peerId, userName) {
-    if (isInCall && localStream) {
+    if (isInCall && localStream && !peerConnections[peerId]) {
         // Initiate call to the new peer
         initiateCall(peerId);
     }
@@ -486,7 +537,7 @@ export function handleUserDisconnectedFromAudio(peerId) {
 }
 
 /**
- * Get list of current audio peers
+ * Get list of current audio peers and connect to them
  */
 export function handleAudioPeersList(peers) {
     console.log('Received audio peers list:', peers);
@@ -511,25 +562,28 @@ export function initAudioControls() {
     if (micBtn) {
         micBtn.addEventListener('click', toggleMic);
 
-        // Add long press to leave call
+        // Long press (1s) leaves the call. The click event that fires on
+        // release would otherwise toggle right back into the call, so it is
+        // suppressed once via suppressNextMicClick.
         let pressTimer;
-        micBtn.addEventListener('mousedown', () => {
+        micBtn.addEventListener('mousedown', startPress);
+        micBtn.addEventListener('mouseup', cancelPress);
+        micBtn.addEventListener('mouseleave', cancelPress);
+        micBtn.addEventListener('touchstart', startPress, { passive: true });
+        micBtn.addEventListener('touchend', cancelPress);
+        micBtn.addEventListener('touchcancel', cancelPress);
+
+        function startPress() {
             if (isInCall) {
                 pressTimer = setTimeout(() => {
+                    suppressNextMicClick = true;
                     leaveCall();
                 }, 1000);
             }
-        });
-        micBtn.addEventListener('mouseup', () => clearTimeout(pressTimer));
-        micBtn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
-        micBtn.addEventListener('touchstart', () => {
-            if (isInCall) {
-                pressTimer = setTimeout(() => {
-                    leaveCall();
-                }, 1000);
-            }
-        });
-        micBtn.addEventListener('touchend', () => clearTimeout(pressTimer));
+        }
+        function cancelPress() {
+            clearTimeout(pressTimer);
+        }
     }
 
     if (speakerBtn) {
@@ -547,7 +601,7 @@ export function initAudioControls() {
             // Simple visual pulse on the call button
             const callBtn = document.getElementById('call-btn');
             if (callBtn) {
-                callBtn.classList.add('pulse-animation'); // We'll assume this class exists or add inline animation
+                callBtn.classList.add('pulse-animation');
                 callBtn.style.animation = 'pulse 1s infinite';
                 setTimeout(() => {
                     callBtn.style.animation = '';
@@ -563,9 +617,6 @@ export function initAudioControls() {
     addCallStatusStyles();
 }
 
-/**
- * Add a dedicated join/leave call button
- */
 /**
  * Add join/leave and request call buttons
  */
@@ -632,18 +683,13 @@ function addJoinCallButton() {
         font-size: 20px;
     `;
 
-    callBtn.addEventListener('click', () => {
+    callBtn.addEventListener('click', async () => {
         if (isInCall) {
             leaveCall();
-            callBtn.style.background = 'rgba(76, 175, 80, 0.6)';
-            callBtn.innerHTML = `<i class="fas fa-phone"></i>`;
-            callBtn.title = 'Join Audio Call';
         } else {
-            joinCall();
-            callBtn.style.background = 'rgba(244, 67, 54, 0.6)'; // Red
-            callBtn.innerHTML = `<i class="fas fa-phone-slash"></i>`;
-            callBtn.title = 'Leave Audio Call';
+            await joinCall();
         }
+        updateCallButton();
     });
 
     // Insert before mic button

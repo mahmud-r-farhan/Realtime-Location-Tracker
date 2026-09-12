@@ -15,32 +15,64 @@ import {
 import { getDeviceName } from './device.js';
 
 export const socket = io({
-    reconnectionAttempts: 5,
-    reconnectionDelay: 3000
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000
 });
+
+// Remember the last joined room/device so the session can be restored after
+// a reconnect - on reconnect the server assigns a NEW socket id and the old
+// room membership is gone. Without re-joining, users silently end up in the
+// "public" room.
+let lastRoom = null;
+let lastDeviceName = null;
+let currentSelfId = null;
 
 export function initSocketEventHandlers(onJoinSuccess) {
     socket.on('connect', () => {
         addNotification('Connected to server');
         setSelfId(socket.id);
+
+        // A reconnect gets a fresh socket id: remove the ghost marker left
+        // behind by our previous session.
+        if (currentSelfId && currentSelfId !== socket.id) {
+            removeMarker(currentSelfId);
+        }
+        currentSelfId = socket.id;
+
+        // Restore room membership after any (re)connect
+        if (lastRoom) {
+            socket.emit('join-room', { room: lastRoom, deviceName: lastDeviceName || getDeviceName() });
+        }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
         addNotification('Disconnected from server');
+        if (reason === 'io server disconnect') {
+            // The server forcefully disconnected us; socket.io will NOT
+            // auto-reconnect in this case - do it manually.
+            socket.connect();
+        }
     });
 
     socket.on('reconnect', (attemptNumber) => {
         addNotification(`Reconnected to server after ${attemptNumber} attempts`);
     });
 
+    socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error.message);
+    });
+
     socket.on('joined-room', (data) => {
+        lastRoom = data.room;
         addNotification(`Joined organization/fleet: ${data.room}`);
         if (onJoinSuccess) onJoinSuccess();
     });
 
     socket.on('receive-location', (data) => {
+        const isNewDevice = !(data.id in markers);
         updateMarker(data);
-        if (!Object.keys(markers).includes(data.id)) {
+        if (isNewDevice) {
             addNotification(`${data.deviceName} started sharing location`);
         }
     });
@@ -58,6 +90,7 @@ export function initSocketEventHandlers(onJoinSuccess) {
     });
 
     socket.on('update-device-list', (devices) => {
+        if (!Array.isArray(devices)) return;
         updateDeviceList(devices, socket.id);
     });
 
@@ -66,7 +99,7 @@ export function initSocketEventHandlers(onJoinSuccess) {
     });
 
     // WebRTC Audio Events
-    socket.on('user-connected', async ({ peerId, userName }) => {
+    socket.on('user-connected', ({ peerId, userName }) => {
         const displayName = userName || 'A new user';
         console.log(`User connected to audio: ${displayName} (${peerId})`);
         handleUserConnectedToAudio(peerId, displayName);
@@ -100,14 +133,17 @@ export function initSocketEventHandlers(onJoinSuccess) {
 
     socket.on('chat-message', (data) => {
         const userName = localStorage.getItem('userName') || getDeviceName();
-        if (data.sender !== userName) {
-            addMessageToChat(data, false);
+        if (data.senderId === socket.id || data.sender === userName) {
+            return; // Own message (already echoed locally on send)
         }
+        addMessageToChat(data, false);
     });
 }
 
 export function emitJoinRoom(room, deviceName) {
-    socket.emit('join-room', { room, deviceName });
+    lastRoom = room || 'public';
+    lastDeviceName = deviceName || null;
+    socket.emit('join-room', { room: lastRoom, deviceName: lastDeviceName });
 }
 
 export function emitSendLocation(locationData) {
