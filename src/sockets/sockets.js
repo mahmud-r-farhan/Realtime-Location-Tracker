@@ -1,4 +1,5 @@
 const sanitizeHtml = require('sanitize-html');
+const { verifySession } = require('../routes/routes');
 
 function getClientIP(socket) {
     const handshake = socket.handshake;
@@ -33,6 +34,21 @@ function getDevicesInRoom(connectedDevices, room) {
 }
 
 module.exports = function setupSockets(io, connectedDevices, peers) {
+    // Require the signed session cookie issued by the web app before allowing a connection.
+    // This prevents unauthenticated clients (e.g. scripts hitting the socket endpoint directly)
+    // from connecting without ever obtaining a server-verified identity.
+    io.use((socket, next) => {
+        const cookieHeader = socket.handshake.headers.cookie || '';
+        const authorized = cookieHeader.split(';').some((c) => {
+            const [k, v] = c.trim().split('=');
+            return k === 'sid' && verifySession(decodeURIComponent(v || ''));
+        });
+        if (!authorized) {
+            return next(new Error('Unauthorized: valid session required'));
+        }
+        next();
+    });
+
     io.on('connection', (socket) => {
         // Get client IP on connection
         const clientIP = getClientIP(socket);
