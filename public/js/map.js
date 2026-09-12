@@ -8,12 +8,13 @@ let followMe = false;
 let selfId = null;
 
 export function initMap(mapId = 'map') {
-    map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
+    map = L.map(mapId, {
+        zoomControl: true,
+        attributionControl: true
+    }).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
 
-    // Issue 1 fix: OSM volunteer tile servers block apps that don't comply with
-    // their usage policy (osm.wiki/Blocked). Switch default to CartoDB Voyager
-    // which is free, requires no API key, and has no such restrictions.
-    baseLayers['Voyager'].addTo(map);
+    // Default layer: Esri Satellite (no API key required, reliable, professional look)
+    baseLayers['Satellite'].addTo(map);
 
     return map;
 }
@@ -62,8 +63,8 @@ export const baseLayers = {
     "Street Map": esriStreet
 };
 
-// Default to Voyager so currentLayer matches what initMap adds
-let currentLayer = voyager;
+// Sync to match the layer added in initMap()
+let currentLayer = satellite;
 
 export function switchLayer(name) {
     const newLayer = baseLayers[name];
