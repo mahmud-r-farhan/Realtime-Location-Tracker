@@ -275,7 +275,7 @@ function attachEventListeners() {
                     updateProfile(newName, newOrg);
                     addNotification('✅ Profile updated!');
                 }
-                
+
                 document.getElementById('name-popup').classList.add('hidden');
                 continueBtn.removeEventListener('click', handleSave);
             };
@@ -437,7 +437,7 @@ function createLayerSelector() {
             });
 
             // Set initial active
-            // This is a bit rough since we don't know the current layer easily without refactoring map.js more 
+            // This is a bit rough since we don't know the current layer easily without refactoring map.js more
             // but we default to OSM usually.
             if (name === 'OpenStreetMap') item.classList.add('active');
 

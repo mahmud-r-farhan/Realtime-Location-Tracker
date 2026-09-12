@@ -1,27 +1,30 @@
 const sanitizeHtml = require('sanitize-html');
 const { verifySession } = require('../routes/routes');
 
+function sanitizeString(str, maxLength = 50) {
+    if (typeof str !== 'string') return '';
+    return sanitizeHtml(str, {
+        allowedTags: [],
+        allowedAttributes: {}
+    }).trim().substring(0, maxLength);
+}
+
 function getClientIP(socket) {
     const handshake = socket.handshake;
-    // Check X-Forwarded-For header (common proxy header)
+    if (!handshake) return 'Unknown';
+
     const forwardedFor = handshake.headers['x-forwarded-for'];
     if (forwardedFor) {
-        // X-Forwarded-For can contain multiple IPs, take the first one (original client)
         const ips = forwardedFor.split(',').map(ip => ip.trim());
         return ips[0];
     }
-    // Check X-Real-IP header (used by some proxies like nginx)
     const realIP = handshake.headers['x-real-ip'];
-    if (realIP) {
-        return realIP;
-    }
-    // Check CF-Connecting-IP for Cloudflare
+    if (realIP) return realIP;
+
     const cfIP = handshake.headers['cf-connecting-ip'];
-    if (cfIP) {
-        return cfIP;
-    }
+    if (cfIP) return cfIP;
+
     let address = handshake.address;
-    // Handle IPv6 mapped IPv4 (::ffff:192.168.1.1)
     if (address && address.startsWith('::ffff:')) {
         address = address.substring(7);
     }
@@ -50,73 +53,67 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
     });
 
     io.on('connection', (socket) => {
-        // Get client IP on connection
         const clientIP = getClientIP(socket);
         socket.clientIP = clientIP;
-        socket.room = 'public'; // Default room
-
-        console.log(`User connected: ${socket.id} (IP: ${clientIP})`);
+        socket.room = 'public';
 
         socket.on('join-room', (data) => {
-            const roomName = data && data.room ? sanitizeHtml(data.room) : 'public';
-            const deviceName = data && data.deviceName ? sanitizeHtml(data.deviceName) : 'Unknown';
+            const rawRoom = data && data.room ? data.room : 'public';
+            const rawDeviceName = data && data.deviceName ? data.deviceName : 'Unknown';
+
+            const roomName = sanitizeString(rawRoom, 50) || 'public';
+            const deviceName = sanitizeString(rawDeviceName, 50) || 'Unknown';
+
+            if (socket.room && socket.room !== roomName) {
+                socket.leave(socket.room);
+            }
 
             socket.join(roomName);
             socket.room = roomName;
             socket.deviceName = deviceName;
 
-            console.log(`User ${socket.id} joined room: ${roomName}`);
-
-            // Notify user they joined
             socket.emit('joined-room', { room: roomName });
 
-            // Send current devices in this room to the new user
             const devicesInRoom = getDevicesInRoom(connectedDevices, roomName);
             socket.emit('update-device-list', devicesInRoom);
-            io.to(roomName).emit('update-user-count', devicesInRoom.length); // Approximate count based on devices sharing location
+            io.to(roomName).emit('update-user-count', devicesInRoom.length);
         });
 
         socket.on('send-location', (data) => {
-            if (!data || data.latitude === undefined || data.longitude === undefined || !data.deviceName) {
-                console.warn(`Invalid location data structure from ${socket.id}`);
+            if (!data || data.latitude === undefined || data.longitude === undefined) {
                 return;
             }
 
-            // Rigorous coordinate validation
             const lat = parseFloat(data.latitude);
             const lng = parseFloat(data.longitude);
             const acc = parseFloat(data.accuracy) || 0;
 
             if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                console.warn(`Out of range coordinates from ${socket.id}: ${lat}, ${lng}`);
                 return;
             }
 
-            // Ensure socket is in a room. If send-location comes before join-room, default to public
             if (!socket.room) {
                 socket.join('public');
                 socket.room = 'public';
             }
 
-            const sanitizedDeviceName = sanitizeHtml(data.deviceName, {
-                allowedTags: [],
-                allowedAttributes: {}
-            }).substring(0, 50); // Limit length
+            const rawName = data.deviceName || socket.deviceName || 'Unknown';
+            const sanitizedDeviceName = sanitizeString(rawName, 50) || 'Unknown';
 
             const deviceData = {
                 latitude: lat,
                 longitude: lng,
                 deviceName: sanitizedDeviceName,
-                accuracy: Math.min(acc, 10000), // Sanity cap for accuracy
-                deviceInfo: typeof data.deviceInfo === 'object' ? data.deviceInfo : {},
-                ip: socket.clientIP, // Add IP address
+                accuracy: Math.max(0, Math.min(acc, 10000)),
+                deviceInfo: typeof data.deviceInfo === 'object' && data.deviceInfo !== null ? data.deviceInfo : {},
+                ip: socket.clientIP,
                 joinedAt: new Date(),
-                room: socket.room // Store room
+                room: socket.room
             };
+
             connectedDevices.set(socket.id, deviceData);
             socket.deviceName = sanitizedDeviceName;
 
-            // Emit ONLY to room
             io.to(socket.room).emit('receive-location', { id: socket.id, ...deviceData });
 
             const devicesInRoom = getDevicesInRoom(connectedDevices, socket.room);
@@ -126,92 +123,85 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
 
         socket.on('request-device-location', (id) => {
             const device = connectedDevices.get(id);
-            // Only allow if in same room
             if (device && device.room === socket.room) {
                 socket.emit('focus-device-location', { id, ...device });
-            } else {
-                console.warn(`Device ${id} not found or in different room for request from ${socket.id}`);
             }
         });
 
         socket.on('chat-message', (data, callback) => {
-            if (!data || !data.text || !socket.deviceName) {
-                console.warn(`Invalid chat message from ${socket.id}`);
-                return callback && callback({ error: 'Invalid message data' });
+            if (!data || !data.text) {
+                if (typeof callback === 'function') {
+                    callback({ error: 'Invalid message text' });
+                }
+                return;
             }
-            // Ensure room
+
             const room = socket.room || 'public';
+            const sanitizedText = sanitizeString(data.text, 1000);
+            if (!sanitizedText) {
+                if (typeof callback === 'function') {
+                    callback({ error: 'Empty message' });
+                }
+                return;
+            }
 
-            const sanitizedText = sanitizeHtml(data.text, {
-                allowedTags: [],
-                allowedAttributes: {}
-            });
-
-            // Use sender from data if available (supports instant profile updates), else socket.deviceName
-            const senderName = data.sender ? sanitizeHtml(data.sender) : (socket.deviceName || 'Unknown');
+            const rawSender = data.sender || socket.deviceName || 'Unknown';
+            const senderName = sanitizeString(rawSender, 50) || 'Unknown';
 
             const messageData = {
-                id: Date.now(),
+                id: `${Date.now()}-${socket.id}`,
                 text: sanitizedText,
                 sender: senderName,
-                senderId: socket.id, // Add sender ID for location tracking
+                senderId: socket.id,
                 timestamp: Date.now(),
                 room: room
             };
 
-            // Broadcast to room
             io.to(room).emit('chat-message', messageData);
 
-            if (callback) {
+            if (typeof callback === 'function') {
                 callback({ success: true, messageId: messageData.id });
             }
         });
 
-        // SOS Alert Handler
         socket.on('sos-alert', (data) => {
-            if (!data || !data.location || !data.sender) {
-                console.warn(`Invalid SOS data from ${socket.id}`);
+            if (!data || !data.location) {
                 return;
             }
 
-            const sanitizedSender = sanitizeHtml(data.sender, {
-                allowedTags: [],
-                allowedAttributes: {}
-            });
-
-            const clientIP = getClientIP(socket);
             const room = socket.room || 'public';
+            const rawSender = data.sender || socket.deviceName || 'Unknown';
+            const sanitizedSender = sanitizeString(rawSender, 50) || 'Unknown';
+
+            const lat = parseFloat(data.location.latitude) || 0;
+            const lng = parseFloat(data.location.longitude) || 0;
+            const acc = parseFloat(data.location.accuracy) || 0;
 
             const sosData = {
                 id: `sos-${Date.now()}-${socket.id}`,
                 sender: sanitizedSender,
                 senderId: socket.id,
                 location: {
-                    latitude: parseFloat(data.location.latitude) || 0,
-                    longitude: parseFloat(data.location.longitude) || 0,
-                    accuracy: parseFloat(data.location.accuracy) || 0
+                    latitude: lat,
+                    longitude: lng,
+                    accuracy: Math.max(0, Math.min(acc, 10000))
                 },
-                deviceInfo: data.deviceInfo || {},
+                deviceInfo: typeof data.deviceInfo === 'object' && data.deviceInfo !== null ? data.deviceInfo : {},
                 ipInfo: {
-                    ip: clientIP
+                    ip: socket.clientIP
                 },
                 message: 'Emergency SOS Alert!',
                 timestamp: Date.now(),
                 room: room
             };
 
-            console.log(`🚨 SOS Alert from ${sanitizedSender} (${socket.id}) in ${room} - IP: ${sosData.ipInfo.ip}`);
-
-            // Broadcast to all users IN THE ROOM (except sender usually, but here use broadcast.to)
             socket.to(room).emit('sos-alert', sosData);
         });
 
-        // Audio/WebRTC Handlers
+        // Audio & WebRTC
         socket.on('join-audio', () => {
             const room = socket.room || 'public';
-            console.log(`🎤 ${socket.deviceName || socket.id} joined audio in ${room}`);
 
-            // Get current list of audio peers in THIS ROOM (excluding the joining user)
             const currentPeers = Array.from(peers.entries())
                 .filter(([peerId, peerData]) => peerId !== socket.id && peerData.room === room)
                 .map(([peerId, peerData]) => ({
@@ -219,41 +209,29 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                     userName: peerData.deviceName
                 }));
 
-            // Add this user to peers with room info
-            peers.set(socket.id, { socket, deviceName: socket.deviceName, room: room });
+            peers.set(socket.id, { socket, deviceName: socket.deviceName || 'Unknown', room: room });
 
-            // Send the list of current peers to the joining user
             socket.emit('audio-peers', currentPeers);
-
-            // Notify other peers IN THE ROOM that a new user joined
             socket.to(room).emit('user-connected', {
                 peerId: socket.id,
-                userName: socket.deviceName
+                userName: socket.deviceName || 'Unknown'
             });
-
-            const roomPeersCount = Array.from(peers.values()).filter(p => p.room === room).length;
-            console.log(`📢 Audio peers count in ${room}: ${roomPeersCount}`);
         });
 
         socket.on('leave-audio', () => {
             const room = socket.room || 'public';
-            console.log(`🔇 ${socket.deviceName || socket.id} left audio in ${room}`);
             peers.delete(socket.id);
 
             socket.to(room).emit('user-disconnected', {
                 peerId: socket.id,
-                userName: socket.deviceName
+                userName: socket.deviceName || 'Unknown'
             });
         });
 
-        // Handle "Request All to Join"
         socket.on('request-join-call', () => {
             const room = socket.room || 'public';
             const senderName = socket.deviceName || 'A user';
-            console.log(`📞 ${senderName} is requesting everyone to join call in ${room}`);
 
-            // Broadcast to everyone in room (including sender is fine, but usually exclude sender)
-            // Using socket.to(room) excludes sender
             socket.to(room).emit('request-join-call', {
                 senderId: socket.id,
                 senderName: senderName
@@ -261,41 +239,35 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
         });
 
         socket.on('offer', ({ target, description }) => {
-            // Check if both are in the same room (optional but good for security)
+            if (!target || !description) return;
             const peer = peers.get(target);
             if (peer && peer.room === socket.room) {
-                console.log(`📨 Offer from ${socket.id} to ${target}`);
                 peer.socket.emit('offer', {
                     peerId: socket.id,
                     description
                 });
-            } else {
-                console.warn(`Peer ${target} not found or in different room for offer from ${socket.id}`);
             }
         });
 
         socket.on('answer', ({ target, description }) => {
+            if (!target || !description) return;
             const peer = peers.get(target);
             if (peer && peer.room === socket.room) {
-                console.log(`📨 Answer from ${socket.id} to ${target}`);
                 peer.socket.emit('answer', {
                     peerId: socket.id,
                     description
                 });
-            } else {
-                console.warn(`Peer ${target} not found or in different room for answer from ${socket.id}`);
             }
         });
 
         socket.on('ice-candidate', ({ target, candidate }) => {
+            if (!target || !candidate) return;
             const peer = peers.get(target);
             if (peer && peer.room === socket.room) {
                 peer.socket.emit('ice-candidate', {
                     peerId: socket.id,
                     candidate
                 });
-            } else {
-                console.debug(`Peer ${target} not found for ICE candidate from ${socket.id}`);
             }
         });
 
@@ -311,7 +283,6 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 });
             }
 
-            // If user was in audio, notify others in room
             if (wasInAudio) {
                 io.to(room).emit('user-disconnected', {
                     peerId: socket.id,
@@ -325,8 +296,6 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const devicesInRoom = getDevicesInRoom(connectedDevices, room);
             io.to(room).emit('update-device-list', devicesInRoom);
             io.to(room).emit('update-user-count', devicesInRoom.length);
-
-            console.log(`User disconnected: ${socket.id} from ${room}`);
         });
     });
 };

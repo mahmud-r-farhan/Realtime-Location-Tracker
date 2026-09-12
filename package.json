@@ -6,9 +6,17 @@
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/*.test.js"
   },
-  "keywords": [],
+  "keywords": [
+    "realtime",
+    "location-tracker",
+    "leaflet",
+    "socket.io",
+    "webrtc",
+    "pwa",
+    "sos-alert"
+  ],
   "author": "Mahmud Rahman",
   "license": "ISC",
   "dependencies": {
@@ -17,13 +25,13 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.2.0",
-    "http": "^0.0.1-security",
     "leaflet": "^1.9.4",
-    "path": "^0.12.7",
-    "sanitize-html": "^2.13.0",
+    "sanitize-html": "2.13.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.0.0"
   }
 }
