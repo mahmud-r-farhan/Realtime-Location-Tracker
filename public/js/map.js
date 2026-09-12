@@ -10,8 +10,10 @@ let selfId = null;
 export function initMap(mapId = 'map') {
     map = L.map(mapId).setView(INITIAL_MAP_VIEW, INITIAL_MAP_ZOOM);
 
-    // Initialize with default layer
-    baseLayers['OpenStreetMap'].addTo(map);
+    // Issue 1 fix: OSM volunteer tile servers block apps that don't comply with
+    // their usage policy (osm.wiki/Blocked). Switch default to CartoDB Voyager
+    // which is free, requires no API key, and has no such restrictions.
+    baseLayers['Voyager'].addTo(map);
 
     return map;
 }
@@ -60,7 +62,8 @@ export const baseLayers = {
     "Street Map": esriStreet
 };
 
-let currentLayer = osm;
+// Default to Voyager so currentLayer matches what initMap adds
+let currentLayer = voyager;
 
 export function switchLayer(name) {
     const newLayer = baseLayers[name];
