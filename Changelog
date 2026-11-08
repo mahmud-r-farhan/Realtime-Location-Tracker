@@ -1,3 +1,5 @@
+Fix audio negotiation when a microphone is muted while an incoming offer is being handled, and add a two-browser simulated microphone regression test.
+
 Review follow-up: correct offline tracking and SOS claims; serve an offline notice when navigation fails, repair retry under CSP, and provide correctly sized PWA install icons.
 
 ### Unreleased — clearer room panel

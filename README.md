@@ -53,6 +53,6 @@ Compose runs in production mode and exposes port 3007 over HTTP. Put a TLS-termi
 
 ## Development and community
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [Changelog](Changelog), and [AUDIT.md](AUDIT.md). The automated suites exercise HTTP and Socket.IO server behavior plus Chromium workspace interactions at several viewport sizes. Browser tests use simulated geolocation, mock or block third-party tiles and disable service workers; they do not validate real mobile GPS, microphone hardware, restrictive networks, service workers, or end-to-end emergency delivery. Verify those separately on real devices before considering a release.
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [Changelog](Changelog), and [AUDIT.md](AUDIT.md). The automated suites exercise HTTP and Socket.IO server behavior plus Chromium workspace interactions at several viewport sizes. Most browser tests use simulated geolocation and mock or block third-party tiles; one test exercises the offline service-worker fallback, and an audio test uses simulated microphones in two local browser contexts. They do not validate real mobile GPS or microphone hardware, restrictive networks, cross-browser service-worker behavior, or end-to-end emergency delivery. Verify those separately on real devices before considering a release.
 
 Licensed under the terms in [LICENSE](LICENSE).

@@ -167,8 +167,10 @@ export async function handleOffer(peerId, description) {
         // Set remote description
         await pc.setRemoteDescription(new RTCSessionDescription(description));
 
-        // Add local tracks if we have them
-        if (localStream && audioEnabled) {
+        // Include muted tracks in the negotiated connection too. A disabled
+        // track sends silence, but retaining its sender lets unmuting resume
+        // audio without renegotiation if the user muted while an offer arrived.
+        if (localStream) {
             localStream.getTracks().forEach(track => {
                 const senders = pc.getSenders();
                 if (!senders.find(sender => sender.track === track)) {
