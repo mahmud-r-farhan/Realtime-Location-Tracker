@@ -44,3 +44,16 @@ export function isValidLatLng(latitude, longitude) {
         latitude >= -90 && latitude <= 90 &&
         longitude >= -180 && longitude <= 180;
 }
+
+// Device-provided fix times are estimates and can be wrong if its clock is off.
+export function formatFixAge(timestamp, now = Date.now()) {
+    const time = Date.parse(timestamp);
+    if (!Number.isFinite(time) || time > now + 120_000) return 'time unavailable';
+    const seconds = Math.max(0, Math.floor((now - time) / 1000));
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hr ago`;
+    return `${Math.floor(hours / 24)} d ago`;
+}

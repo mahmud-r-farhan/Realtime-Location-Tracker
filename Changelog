@@ -1,3 +1,52 @@
+Review follow-up: correct offline tracking and SOS claims; serve an offline notice when navigation fails, repair retry under CSP, and provide correctly sized PWA install icons.
+
+### Unreleased — clearer room panel
+
+- Simplified the devices panel, placed the fit-all action before the list and put audio labels inside their clickable controls.
+- Distinguished an unavailable location list from a confirmed empty room, clear old room data during transitions, and copy invites for the actual joined room.
+- Matched audio icons and labels to their state and prevented audio invites while disconnected.
+
+---
+
+### Unreleased — devices drawer polish
+
+- Grouped shared locations, device details and map fitting into a clearer responsive section; refined empty, dark-mode, room access and audio-control states.
+- Preserved device-row focus during live updates and exposed fix information to assistive technology.
+
+---
+
+### Unreleased — device, SOS and activity improvements
+
+- Unified best-effort device recognition, including ChromeOS, iPadOS and iOS browsers; replaced map device art with labelled, accessible high-contrast location pins.
+- Added explicit SOS send/relay/unconfirmed states, bounded location attempts, room-change protection, labelled fallback fixes and a dedicated SOS map pin; IP enrichment no longer delays incoming alerts. SOS still cannot contact emergency services or guarantee delivery.
+- Added user-initiated browser notification permission, room-labelled local SOS history, an activity unread indicator and clear action, touch dragging, and compact landscape SOS layout.
+
+---
+
+### Unreleased — map behavior and responsive controls
+
+- Preserve a deliberately chosen map view during GPS updates, including when a marker popup is open; center the first fix only when the user has not chosen a view.
+- Surface complete tile-loading failures with a retry action and improve map attribution.
+- Keep the devices drawer and map controls accessible across desktop, narrow phone and landscape layouts; add mocked-tile and control-overlap browser coverage.
+
+---
+
+### Unreleased — location controls and clarity
+
+- Added persistent per-browser pause/resume controls, server-side late-packet protection, and a retry path for denied location permission; pausing does not leave audio.
+- Added device-reported fix age, estimated accuracy, periodic stationary refreshes, room-wide map fitting, and clearer offline state.
+- Added an original onboarding illustration and regression tests for pause, reconnect and geolocation failure. SOS still independently requests location.
+
+---
+
+### Unreleased — responsive workspace refresh
+
+- Redesigned the welcome screen, device drawer, room status, activity panel and chat for desktop and small screens.
+- Improved keyboard access, focus states, reduced-motion support, audio state feedback and SOS hold cancellation.
+- Added Chromium workspace interaction checks at desktop, mobile and landscape sizes to CI.
+
+---
+
 ### Unreleased — v5 stabilization (not a production release)
 
 - Fixed public-room membership, room transition cleanup, location snapshots and reconnect republishing.

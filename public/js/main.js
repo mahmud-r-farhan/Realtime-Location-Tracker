@@ -1,5 +1,5 @@
 import { initMap, focusMapOnDevice } from './map.js';
-import { getDeviceName, getDeviceInfo } from './device.js';
+import { getDeviceName, getDeviceInfoSafely } from './device.js';
 import { showNamePopup, hideNamePopup, getUserNameInput, getOrgInput, initSidebar, setupContinueButton, initInviteLink } from './ui.js';
 import { initNotificationPanel, addNotification } from './notification.js';
 import { initSocketEventHandlers, emitSendLocation, emitJoinRoom } from './socket.js';
@@ -12,13 +12,14 @@ import { initControls } from './controls.js';
 import { initBatteryMonitor } from './batteryMonitor.js';
 import { getUserName, getOrgName, updateProfile } from './profile.js';
 import { haversineDistance } from './utils.js';
+import { initDialogFocus } from './dialogs.js';
 
 // Expose focusMapOnDevice globally for SOS
 window.focusMapOnLocation = focusMapOnDevice;
 
 // Debug exposure
 import { socket } from './socket.js';
-import { map, markers, updateMarker, toggleFollowMe, setSelfId } from './map.js';
+import { map, markers, updateMarker, toggleFollowMe, setSelfId, removeMarker } from './map.js';
 
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     window.__DEBUG__ = {
@@ -36,6 +37,8 @@ let locationSendIntervalId = null;
 let isStationary = false;
 let appInitialized = false;
 let roomReady = false;
+let sharingPaused = localStorage.getItem('locationSharingPaused') === 'true';
+let sharingState = sharingPaused ? 'paused' : 'waiting';
 
 // Motion-based battery optimization: slow GPS polling after the device has
 // been motionless for a while (time-based rather than counting events, since
@@ -53,6 +56,7 @@ window.addEventListener('profileUpdate', (e) => {
     // Re-join so the server moves us to the new organization/fleet room
     roomReady = false;
     locationGeneration++;
+    if (!sharingPaused) setSharingState('waiting');
     emitJoinRoom(orgName, userName || deviceName);
     addNotification('🔄 Profile updated synced');
 });
@@ -85,12 +89,12 @@ function initMotionDetection() {
                 if (isStationary) {
                     console.log('Motion detected! Increasing update frequency.');
                     isStationary = false;
-                    startLocationUpdates(LOCATION_SEND_INTERVAL);
+                    if (sharingState !== 'denied') startLocationUpdates(LOCATION_SEND_INTERVAL);
                 }
             } else if (!isStationary && Date.now() - lastMotionTime >= STATIONARY_AFTER_MS) {
                 console.log('Device stationary. Reducing update frequency.');
                 isStationary = true;
-                startLocationUpdates(LOCATION_IDLE_INTERVAL);
+                if (sharingState !== 'denied') startLocationUpdates(LOCATION_IDLE_INTERVAL);
             }
         });
         console.log('Motion detection initialized for Battery Optimization.');
@@ -105,11 +109,84 @@ let locationGeneration = 0;
 // GPS readings jitter by several meters even when standing still; exact float
 // comparison never deduplicates. Skip sends when movement is below this.
 const MIN_SEND_DISTANCE_METERS = 8;
+const MAX_SILENCE_MS = 60_000;
+let lastSentAt = 0;
+
+const sharingMessages = {
+    waiting: ['Waiting', 'Waiting to join the room.'],
+    locating: ['Locating', 'Waiting for a location fix from your device.'],
+    sharing: ['Sharing', 'Your latest fix is shared with this room.'],
+    paused: ['Paused', 'No new location updates will be sent. A disconnected device may remain visible briefly.'],
+    denied: ['Permission denied', 'Allow location access in your browser settings, then try again.'],
+    unavailable: ['Fix unavailable', 'Could not get a fresh fix. A previous fix may still be visible.'],
+    offline: ['Offline', 'Location sharing will resume when the connection returns.']
+};
+
+function setSharingState(state) {
+    sharingState = sharingPaused ? 'paused' : state;
+    const [label, description] = sharingMessages[sharingState];
+    const indicator = document.getElementById('sharing-indicator');
+    const detail = document.getElementById('sharing-description');
+    const toggle = document.getElementById('sharing-toggle');
+    const retry = document.getElementById('sharing-retry');
+    if (indicator) { indicator.textContent = label; indicator.dataset.state = sharingState; }
+    if (detail) detail.textContent = description;
+    if (toggle) {
+        toggle.textContent = sharingPaused ? 'Resume sharing' : 'Pause sharing';
+        toggle.setAttribute('aria-pressed', String(!sharingPaused));
+    }
+    retry?.classList.toggle('hidden', sharingPaused || !['denied', 'unavailable'].includes(sharingState));
+}
+
+function stopLocationTimer() {
+    if (locationSendIntervalId) clearInterval(locationSendIntervalId);
+    locationSendIntervalId = null;
+}
+
+function removeSharedLocation() {
+    if (socket.id) removeMarker(socket.id);
+    if (socket.connected) socket.emit('stop-sharing-location');
+}
+
+function initSharingControls() {
+    setSharingState(sharingState);
+    document.getElementById('sharing-toggle')?.addEventListener('click', () => {
+        sharingPaused = !sharingPaused;
+        localStorage.setItem('locationSharingPaused', String(sharingPaused));
+        locationGeneration++;
+        lastLocation = null;
+        lastSentAt = 0;
+        if (sharingPaused) {
+            stopLocationTimer();
+            removeSharedLocation();
+            setSharingState('paused');
+            addNotification('Location sharing paused');
+        } else {
+            if (socket.connected) socket.emit('resume-location-sharing');
+            setSharingState(socket.connected ? (roomReady ? 'locating' : 'waiting') : 'offline');
+            if (socket.connected && roomReady) startLocationUpdates(isStationary ? LOCATION_IDLE_INTERVAL : LOCATION_SEND_INTERVAL);
+            addNotification('Location sharing resumed');
+        }
+    });
+    document.getElementById('sharing-retry')?.addEventListener('click', () => {
+        if (sharingPaused) return;
+        locationGeneration++;
+        lastLocation = null;
+        if (socket.connected) socket.emit('resume-location-sharing');
+        setSharingState(socket.connected ? (roomReady ? 'locating' : 'waiting') : 'offline');
+        if (socket.connected && roomReady) startLocationUpdates(isStationary ? LOCATION_IDLE_INTERVAL : LOCATION_SEND_INTERVAL);
+    });
+    window.addEventListener('tracker-location-shared', () => {
+        if (!sharingPaused && roomReady) setSharingState('sharing');
+    });
+}
 
 async function sendLocationData() {
-    if (locationRequestInFlight || !socket.connected || !roomReady) return;
+    if (sharingPaused || locationRequestInFlight || !socket.connected || !roomReady) return;
     if (!('geolocation' in navigator)) {
+        setSharingState('unavailable');
         addNotification('Geolocation is not available.');
+        stopLocationTimer();
         return;
     }
     locationRequestInFlight = true;
@@ -128,13 +205,14 @@ async function sendLocationData() {
         // Optimization: don't send if the device hasn't moved meaningfully
         if (lastLocation) {
             const moved = haversineDistance(lastLocation.latitude, lastLocation.longitude, latitude, longitude);
-            if (moved < MIN_SEND_DISTANCE_METERS) {
+            if (sharingState === 'sharing' && moved < MIN_SEND_DISTANCE_METERS && Date.now() - lastSentAt < MAX_SILENCE_MS) {
                 return;
             }
         }
 
-        const info = await getDeviceInfo();
-        if (!socket.connected || !roomReady || generation !== locationGeneration) return;
+        const info = await getDeviceInfoSafely();
+        if (sharingPaused || !socket.connected || !roomReady || generation !== locationGeneration) return;
+        lastSentAt = Date.now();
         lastLocation = { latitude, longitude };
 
         const displayName = getUserName() || deviceName;
@@ -144,19 +222,22 @@ async function sendLocationData() {
             longitude,
             deviceName: displayName,
             accuracy,
+            capturedAt: position.timestamp,
             deviceInfo: info
         });
     } catch (error) {
+        if (generation !== locationGeneration || sharingPaused) return;
         console.error('Error getting location:', error);
         // Only notify specific errors to avoid spamming
         if (error.code === 1) {
+            setSharingState('denied');
+            removeSharedLocation();
             addNotification('Location access denied.');
             showPermissionDeniedAlert('location');
             // Stop polling - retrying a denied permission just burns battery
-            if (locationSendIntervalId) {
-                clearInterval(locationSendIntervalId);
-                locationSendIntervalId = null;
-            }
+            stopLocationTimer();
+        } else {
+            setSharingState('unavailable');
         }
     } finally {
         locationRequestInFlight = false;
@@ -182,7 +263,7 @@ function showPermissionDeniedAlert(type) {
             <div style="font-size: 40px; margin-bottom: 20px;">⚠️</div>
             <h2>${type === 'location' ? 'Location' : 'Microphone'} Access Denied</h2>
             <p style="margin: 15px 0;">We cannot ${type === 'location' ? 'track your location' : 'process audio'} because permission was denied.</p>
-            <p style="color: #666; font-size: 14px;">Please enable permissions in your browser settings (look for the lock icon in the address bar) and reload the page.</p>
+            <p style="color: #666; font-size: 14px;">Enable permission in your browser settings, then use Try again in the Devices panel.</p>
             <button class="retry-btn" style="margin-top: 20px; padding: 10px 20px; background: #4f46e5; color: white; border: none; border-radius: 6px; cursor: pointer;">I Understand</button>
         </div>
     `;
@@ -191,9 +272,10 @@ function showPermissionDeniedAlert(type) {
 }
 
 function startLocationUpdates(interval) {
-    if (locationSendIntervalId) clearInterval(locationSendIntervalId);
-    sendLocationData(); // Send immediately
+    stopLocationTimer();
+    if (sharingPaused) return;
     locationSendIntervalId = setInterval(sendLocationData, interval);
+    sendLocationData(); // Send immediately
 }
 
 function initializeApp() {
@@ -202,12 +284,10 @@ function initializeApp() {
     if (appInitialized) return;
     appInitialized = true;
 
-    // Initialize theme system first (applies CSS variables)
-    initTheme();
-
     // Core modules
     initMap();
     initSidebar();
+    initSharingControls();
     initAudioControls();
     initChat();
     initNotificationPanel();
@@ -222,6 +302,7 @@ function initializeApp() {
         roomReady = false;
         locationGeneration++;
         lastLocation = null;
+        setSharingState('offline');
     });
 
     // Install listeners before joining: a fast acknowledgement must not be lost.
@@ -230,14 +311,22 @@ function initializeApp() {
         locationGeneration++;
         roomReady = true;
         lastLocation = null;
-        startLocationUpdates(LOCATION_SEND_INTERVAL);
+        if (!sharingPaused) {
+            socket.emit('resume-location-sharing');
+            setSharingState('locating');
+            startLocationUpdates(isStationary ? LOCATION_IDLE_INTERVAL : LOCATION_SEND_INTERVAL);
+        } else {
+            stopLocationTimer();
+            setSharingState('paused');
+        }
         initMotionDetection();
-        addNotification('📍 Location sharing enabled');
     });
     emitJoinRoom(getOrgName(), getUserName() || deviceName);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    initDialogFocus();
     // Handle room join from URL
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');

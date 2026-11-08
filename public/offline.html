@@ -194,10 +194,9 @@
         </div>
 
         <h1>You're Offline</h1>
-        <p>It seems you've lost your internet connection. Don't worry, your tracking data will sync when you're back
-            online.</p>
+        <p>The tracker server could not be reached. Live locations, chat, audio and SOS need a connection and are not queued for later delivery.</p>
 
-        <button class="retry-btn" onclick="tryReconnect()">Try Again</button>
+        <button class="retry-btn" id="retryButton">Try Again</button>
 
         <div class="status-bar" id="statusBar">
             <span class="status-dot"></span>
@@ -210,46 +209,31 @@
                 <li>Check your Wi-Fi or mobile data connection</li>
                 <li>Move to an area with better signal</li>
                 <li>Try enabling airplane mode and then disabling it</li>
-                <li>Your location data is cached locally</li>
+                <li>Contact emergency services directly if you need urgent help</li>
             </ul>
         </div>
     </div>
 
     <script>
         function tryReconnect() {
-            if (navigator.onLine) {
-                window.location.reload();
-            } else {
-                const btn = document.querySelector('.retry-btn');
-                btn.textContent = 'Still offline...';
-                setTimeout(() => {
-                    btn.textContent = 'Try Again';
-                }, 2000);
-            }
+            // Network connectivity does not guarantee that the tracker server
+            // is reachable. Always let the user retry the application.
+            window.location.assign('/');
         }
 
-        // Listen for online/offline events
-        window.addEventListener('online', () => {
+        function updateNetworkHint() {
             const statusBar = document.getElementById('statusBar');
             const statusText = document.getElementById('statusText');
-            statusBar.classList.add('online');
-            statusText.textContent = 'Back online! Reconnecting...';
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        });
-
-        window.addEventListener('offline', () => {
-            const statusBar = document.getElementById('statusBar');
-            const statusText = document.getElementById('statusText');
-            statusBar.classList.remove('online');
-            statusText.textContent = 'Waiting for connection...';
-        });
-
-        // Check connection status on load
-        if (navigator.onLine) {
-            window.location.href = '/';
+            statusBar.classList.toggle('online', navigator.onLine);
+            statusText.textContent = navigator.onLine
+                ? 'Network available. Try reconnecting to the tracker.'
+                : 'Waiting for a network connection...';
         }
+
+        document.getElementById('retryButton').addEventListener('click', tryReconnect);
+        window.addEventListener('online', updateNetworkHint);
+        window.addEventListener('offline', updateNetworkHint);
+        updateNetworkHint();
     </script>
 </body>
 

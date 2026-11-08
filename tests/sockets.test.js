@@ -292,6 +292,32 @@ describe('Socket.IO Realtime Event Handlers', () => {
         assert.strictEqual(received[1].locationAvailable, true);
     });
 
+    it('rejects an SOS bound to a different room and preserves unknown accuracy', async () => {
+        const join = async client => {
+            const done = withTimeout(new Promise(resolve => client.once('joined-room', resolve)));
+            client.emit('join-room', { room: 'sos-current', deviceName: 'Device' });
+            await done;
+        };
+        await Promise.all([join(clientSocket1), join(clientSocket2)]);
+        let relayed = false;
+        clientSocket2.once('sos-alert', () => { relayed = true; });
+        const rejected = await withTimeout(new Promise(resolve => clientSocket1.emit('sos-alert', {
+            expectedRoom: 'sos-old', location: { latitude: 1, longitude: 2, accuracy: null }
+        }, resolve)));
+        assert.match(rejected.error, /changed/);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.strictEqual(relayed, false);
+        const reconnected = await withTimeout(new Promise(resolve => clientSocket1.emit('sos-alert', {
+            expectedRoom: 'sos-current', expectedSocketId: 'old-connection', location: { latitude: 1, longitude: 2 }
+        }, resolve)));
+        assert.match(reconnected.error, /connection changed/);
+        const receive = withTimeout(new Promise(resolve => clientSocket2.once('sos-alert', resolve)));
+        clientSocket1.emit('sos-alert', { expectedRoom: 'sos-current', location: { latitude: 1, longitude: 2, accuracy: null }, locationSource: 'last-shared' });
+        const alert = await receive;
+        assert.strictEqual(alert.location.accuracy, null);
+        assert.strictEqual(alert.locationSource, 'last-shared');
+    });
+
     it('sos-alert with a missing location gets an error ack and is not relayed', async () => {
         clientSocket1.emit('join-room', { room: 'invalid-room', deviceName: 'Broken' });
         clientSocket2.emit('join-room', { room: 'invalid-room', deviceName: 'Watcher' });
@@ -307,6 +333,63 @@ describe('Socket.IO Realtime Event Handlers', () => {
         assert.ok(typeof ack.error === 'string' && ack.error.length > 0);
         await new Promise(r => setTimeout(r, 100));
         assert.strictEqual(relayed, false);
+    });
+
+    it('pauses and resumes only the sender location without ending audio', async () => {
+        const join = async client => {
+            const done = withTimeout(new Promise(resolve => client.once('joined-room', resolve)));
+            client.emit('join-room', { room: 'pause-room', deviceName: 'Device' });
+            await done;
+        };
+        await join(clientSocket1);
+        await join(clientSocket2);
+        const peerList = withTimeout(new Promise(resolve => clientSocket1.once('audio-peers', resolve)));
+        clientSocket1.emit('join-audio');
+        await peerList;
+        const firstFix = withTimeout(new Promise(resolve => clientSocket2.once('receive-location', resolve)));
+        clientSocket1.emit('send-location', { latitude: 1, longitude: 2, capturedAt: Date.now(), accuracy: 15 });
+        const fix = await firstFix;
+        assert.ok(fix.capturedAt);
+        assert.equal(fix.accuracy, 15);
+        const stopped = withTimeout(new Promise(resolve => clientSocket2.once('location-stopped', resolve)));
+        const empty = withTimeout(new Promise(resolve => clientSocket2.once('update-device-list', resolve)));
+        let audioEnded = false;
+        clientSocket2.on('user-disconnected', () => { audioEnded = true; });
+        const stopAck = await withTimeout(new Promise(resolve => clientSocket1.emit('stop-sharing-location', resolve)));
+        assert.equal(stopAck.success, true);
+        assert.equal((await stopped).id, clientSocket1.id);
+        assert.equal((await empty).length, 0);
+        let leaked = false;
+        clientSocket2.on('receive-location', () => { leaked = true; });
+        clientSocket1.emit('send-location', { latitude: 3, longitude: 4 });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.equal(leaked, false, 'late locations must not be relayed while paused');
+        assert.equal(audioEnded, false, 'pausing location must not leave audio');
+        await withTimeout(new Promise(resolve => clientSocket1.emit('resume-location-sharing', resolve)));
+        const nextFix = withTimeout(new Promise(resolve => clientSocket2.once('receive-location', resolve)));
+        clientSocket1.emit('send-location', { latitude: 3, longitude: 4, accuracy: null, capturedAt: Date.now() + 3600000 });
+        const resumed = await nextFix;
+        assert.equal(resumed.latitude, 3);
+        assert.equal(resumed.accuracy, null);
+        assert.equal(resumed.capturedAt, null, 'implausible device clock should not be presented as a fix time');
+    });
+
+    it('does not announce a location pause to another room', async () => {
+        const join = async (client, room) => {
+            const done = withTimeout(new Promise(resolve => client.once('joined-room', resolve)));
+            client.emit('join-room', { room, deviceName: 'Device' });
+            await done;
+        };
+        await join(clientSocket1, 'room-one');
+        await join(clientSocket2, 'room-two');
+        const ownFix = withTimeout(new Promise(resolve => clientSocket1.once('receive-location', resolve)));
+        clientSocket1.emit('send-location', { latitude: 10, longitude: 20 });
+        await ownFix;
+        let leaked = false;
+        clientSocket2.on('location-stopped', () => { leaked = true; });
+        await withTimeout(new Promise(resolve => clientSocket1.emit('stop-sharing-location', resolve)));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.equal(leaked, false);
     });
 
     it('joins the public room by default', async () => {

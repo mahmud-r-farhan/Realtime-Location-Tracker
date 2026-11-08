@@ -4,10 +4,10 @@
  */
 
 // Imports
-import { map } from './map.js';
+import { map, focusMapOnDevice } from './map.js';
 import { toggleTheme, getCurrentTheme } from './theme.js';
 import { addNotification } from './notification.js';
-import { showNamePopup } from './ui.js';
+import { showNamePopup, hideNamePopup } from './ui.js';
 import { getUserName, getOrgName, updateProfile } from './profile.js';
 
 // State
@@ -18,7 +18,9 @@ let mapLayerDropdownOpen = false;
  * Go to user's current location on the map
  */
 export async function goToMyLocation() {
-    const btn = document.getElementById('my-location-btn') || document.getElementById('mobile-my-location-btn');
+    const btn = window.matchMedia('(max-width: 768px)').matches
+        ? document.getElementById('mobile-my-location-btn')
+        : document.getElementById('fab-location-btn');
 
     if (btn) {
         btn.classList.add('loading');
@@ -41,7 +43,7 @@ export async function goToMyLocation() {
         const { latitude, longitude } = position.coords;
 
         if (map) {
-            map.setView([latitude, longitude], 16);
+            focusMapOnDevice(latitude, longitude, 16);
             addNotification('📍 Centered on your location');
 
             // Create a pulsing marker at current location
@@ -111,6 +113,7 @@ export function toggleFabMenu() {
     }
     if (fabBtn) {
         fabBtn.classList.toggle('open', fabOpen);
+        fabBtn.setAttribute('aria-expanded', String(fabOpen));
     }
 }
 
@@ -169,7 +172,7 @@ function createFabMenu() {
                 <span class="fab-tooltip">Profile</span>
             </button>
         </div>
-        <button id="fab-btn" class="fab-main" title="Controls">
+        <button id="fab-btn" class="fab-main" title="Controls" aria-label="Map controls" aria-expanded="false" aria-controls="fab-menu">
             <i class="fas fa-plus"></i>
         </button>
     `;
@@ -220,7 +223,23 @@ function openProfileEditor() {
     nameInput.value = getUserName() || '';
     orgInput.value = getOrgName() === 'public' ? '' : getOrgName();
 
+    const returnFocus = document.activeElement;
+    const cancelBtn = document.getElementById('profile-cancel');
+    const title = document.getElementById('welcome-title');
+    const description = document.getElementById('welcome-description');
+    if (title) title.textContent = 'Edit your profile';
+    if (description) description.textContent = 'Update your name or switch to another room.';
+    cancelBtn?.classList.remove('hidden');
     showNamePopup();
+    const closeEditor = () => {
+        hideNamePopup();
+        cancelBtn?.classList.add('hidden');
+        document.removeEventListener('keydown', onEscape);
+        if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus();
+    };
+    const onEscape = event => { if (event.key === 'Escape') closeEditor(); };
+    document.addEventListener('keydown', onEscape);
+    if (cancelBtn) cancelBtn.onclick = closeEditor;
 
     const handleSave = () => {
         const newName = nameInput.value.trim();
@@ -229,8 +248,7 @@ function openProfileEditor() {
         updateProfile(newName, newOrg);
         addNotification('✅ Profile updated!');
 
-        document.getElementById('name-popup')?.classList.add('hidden');
-        continueBtn.removeEventListener('click', handleSave);
+        closeEditor();
     };
 
     // Remove previous listeners (cloning node is a dirty but effective reset).
@@ -238,6 +256,7 @@ function openProfileEditor() {
     // "Continue" - re-enable it or the Save button never responds.
     const newBtn = continueBtn.cloneNode(true);
     newBtn.disabled = false;
+    newBtn.textContent = 'Save changes';
     continueBtn.parentNode.replaceChild(newBtn, continueBtn);
     newBtn.addEventListener('click', handleSave);
 }
@@ -338,6 +357,7 @@ function toggleLayerSelector() {
     const selector = document.getElementById('layer-selector-modal');
     if (selector) {
         selector.classList.toggle('hidden');
+        if (!selector.classList.contains('hidden')) selector.querySelector('.close-layer-selector')?.focus();
     } else {
         createLayerSelector();
     }
@@ -348,12 +368,15 @@ function toggleLayerSelector() {
  */
 function createLayerSelector() {
     import('./map.js').then(module => {
-        const { baseLayers, switchLayer } = module;
+        const { baseLayers, switchLayer, getCurrentLayerName } = module;
         const layerNames = Object.keys(baseLayers);
 
         const modal = document.createElement('div');
         modal.id = 'layer-selector-modal';
         modal.className = 'layer-selector-modal'; // Start visible
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'layer-selector-title');
 
         const content = document.createElement('div');
         content.className = 'layer-selector-content';
@@ -361,15 +384,16 @@ function createLayerSelector() {
         const header = document.createElement('div');
         header.className = 'layer-selector-header';
         header.innerHTML = `
-            <h3>Select Map Style</h3>
-            <button class="close-layer-selector">&times;</button>
+            <h3 id="layer-selector-title">Select Map Style</h3>
+            <button class="close-layer-selector" aria-label="Close map styles">&times;</button>
         `;
 
         const list = document.createElement('div');
         list.className = 'layer-list';
 
         layerNames.forEach(name => {
-            const item = document.createElement('div');
+            const item = document.createElement('button');
+            item.type = 'button';
             item.className = 'layer-item';
             item.innerHTML = `
                 <div class="layer-preview ${name.replace(/\s+/g, '-').toLowerCase()}">
@@ -384,12 +408,12 @@ function createLayerSelector() {
                 // Update active state
                 document.querySelectorAll('.layer-item').forEach(i => i.classList.remove('active'));
                 item.classList.add('active');
+                list.querySelectorAll('.layer-item').forEach(i => i.setAttribute('aria-pressed', String(i === item)));
             });
 
-            // Set initial active
-            // This is a bit rough since we don't know the current layer easily without refactoring map.js more
-            // but we default to OSM usually.
-            if (name === 'OpenStreetMap') item.classList.add('active');
+            const active = name === getCurrentLayerName();
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-pressed', String(active));
 
             list.appendChild(item);
         });
@@ -401,8 +425,18 @@ function createLayerSelector() {
         document.body.appendChild(modal);
 
         // Close button logic
-        header.querySelector('.close-layer-selector').addEventListener('click', () => {
+        const closeButton = header.querySelector('.close-layer-selector');
+        closeButton.focus();
+        closeButton.addEventListener('click', () => {
             modal.classList.add('hidden');
+        });
+        modal.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                modal.classList.add('hidden');
+                const trigger = window.matchMedia('(max-width: 768px)').matches
+                    ? document.getElementById('mobile-layers-btn') : document.getElementById('fab-layers-btn');
+                trigger?.focus();
+            }
         });
 
         // Add specific styles for this modal
@@ -415,7 +449,7 @@ function createLayerSelector() {
                 width: 100%;
                 height: 100%;
                 background: rgba(0,0,0,0.5);
-                z-index: 2000; /* Above everything */
+                z-index: 10000; /* Above workspace controls */
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -475,6 +509,8 @@ function createLayerSelector() {
                 cursor: pointer;
                 transition: all 0.2s;
                 background: var(--bg-secondary, #f8f9fa);
+                color: var(--text-primary);
+                font: inherit;
             }
             .layer-item:hover {
                 background: var(--bg-tertiary, #e9ecef);

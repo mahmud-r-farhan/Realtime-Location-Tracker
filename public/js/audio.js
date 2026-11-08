@@ -1,5 +1,5 @@
 import { WEBRTC_CONFIGURATION } from './config.js';
-import { socket, emitJoinAudio, emitLeaveAudio } from './socket.js';
+import { socket, emitJoinAudio, emitLeaveAudio, getJoinedRoom } from './socket.js';
 import { addNotification } from './notification.js';
 import { playCallRing } from './sounds.js';
 
@@ -8,6 +8,8 @@ let localStream = null;
 let audioEnabled = false;
 let speakerEnabled = true;
 let isInCall = false;
+let isJoiningCall = false;
+let audioGeneration = 0;
 // Set when a long-press leave fires, so the trailing click is ignored once.
 let suppressNextMicClick = false;
 
@@ -308,6 +310,12 @@ async function initiateCall(peerId) {
  * Join the audio call
  */
 async function joinCall() {
+    if (isInCall || isJoiningCall) return;
+    if (!socket.connected || !getJoinedRoom()) { addNotification('Connect to a room before joining audio.'); return; }
+    isJoiningCall = true;
+    const generation = audioGeneration;
+    const button = document.getElementById('call-btn');
+    if (button) button.disabled = true;
     try {
         // Get microphone access
         localStream = await navigator.mediaDevices.getUserMedia({
@@ -318,6 +326,12 @@ async function joinCall() {
             }
         });
 
+        if (!socket.connected || generation !== audioGeneration) {
+            localStream.getTracks().forEach(track => track.stop());
+            localStream = null;
+            addNotification('Audio request cancelled after leaving the room or disconnecting.');
+            return;
+        }
         audioEnabled = true;
         isInCall = true;
 
@@ -340,6 +354,10 @@ async function joinCall() {
         } else {
             addNotification('Failed to access microphone.');
         }
+    } finally {
+        isJoiningCall = false;
+        if (button) button.disabled = false;
+        updateCallUI();
     }
 }
 
@@ -347,6 +365,7 @@ async function joinCall() {
  * Leave the audio call
  */
 export function leaveCall() {
+    audioGeneration++;
     if (!isInCall && !localStream) return;
     // Stop local stream
     if (localStream) {
@@ -407,11 +426,14 @@ function toggleMic() {
 function updateMicButton(enabled) {
     const micBtn = document.getElementById('mic-btn');
     if (micBtn) {
-        const img = micBtn.querySelector('img');
-        if (img) {
-            img.src = enabled ? '/assets/microphone-on-icon.png' : '/assets/microphone-muted-icon.png';
-        }
+        const icon = micBtn.querySelector('.audio-control-icon');
+        if (icon) icon.className = `fas ${enabled ? 'fa-microphone' : 'fa-microphone-slash'} audio-control-icon`;
+        const label = micBtn.querySelector('.audio-button-label');
+        if (label) label.textContent = enabled ? 'Mic on' : 'Mic off';
         micBtn.classList.toggle('active', enabled);
+        micBtn.setAttribute('aria-label', isInCall ? (enabled ? 'Mute microphone' : 'Unmute microphone') : 'Join audio call');
+        micBtn.title = micBtn.getAttribute('aria-label');
+        micBtn.setAttribute('aria-pressed', String(enabled));
     }
 }
 
@@ -428,11 +450,14 @@ function toggleSpeaker() {
 
     const speakerBtn = document.getElementById('speaker-btn');
     if (speakerBtn) {
-        const img = speakerBtn.querySelector('img');
-        if (img) {
-            img.src = speakerEnabled ? '/assets/speaker-on-icon.png' : '/assets/speaker-off-icon.png';
-        }
+        const icon = speakerBtn.querySelector('.audio-control-icon');
+        if (icon) icon.className = `fas ${speakerEnabled ? 'fa-volume-up' : 'fa-volume-mute'} audio-control-icon`;
+        const label = speakerBtn.querySelector('.audio-button-label');
+        if (label) label.textContent = speakerEnabled ? 'Sound on' : 'Sound off';
         speakerBtn.classList.toggle('active', speakerEnabled);
+        speakerBtn.setAttribute('aria-pressed', String(speakerEnabled));
+        speakerBtn.setAttribute('aria-label', speakerEnabled ? 'Mute speaker' : 'Unmute speaker');
+        speakerBtn.title = speakerBtn.getAttribute('aria-label');
     }
 
     addNotification(speakerEnabled ? 'Speaker enabled' : 'Speaker disabled');
@@ -453,6 +478,13 @@ function updateCallUI() {
         audioControls.parentNode.insertBefore(callStatusElement, audioControls);
     }
 
+    const callButton = document.getElementById('call-btn');
+    if (callButton) {
+        callButton.innerHTML = isInCall ? '<i class="fas fa-phone-slash" aria-hidden="true"></i><span class="audio-button-label">Leave</span>' : '<i class="fas fa-phone" aria-hidden="true"></i><span class="audio-button-label">Join</span>';
+        callButton.title = isInCall ? 'Leave audio call' : 'Join audio call';
+        callButton.setAttribute('aria-label', callButton.title);
+        callButton.classList.toggle('in-call', isInCall);
+    }
     const peerCount = Object.keys(peerConnections).length;
     const connectedPeers = Object.values(peerConnections).filter(
         pc => pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed'
@@ -583,31 +615,19 @@ function addJoinCallButton() {
     // 1. Request All Button
     const requestBtn = document.createElement('button');
     requestBtn.id = 'request-call-btn';
-    requestBtn.innerHTML = `<i class="fas fa-bullhorn"></i>`; // Icon for "announce/call all"
+    requestBtn.innerHTML = `<i class="fas fa-bullhorn" aria-hidden="true"></i><span class="audio-button-label">Invite</span>`; // Icon for "announce/call all"
     requestBtn.title = 'Request everyone to join call';
-    requestBtn.style.cssText = `
-        padding: 12px;
-        background: rgba(33, 150, 243, 0.6); /* Blue */
-        border: none;
-        border-radius: 50%;
-        cursor: pointer;
-        margin: 0 8px;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
-        width: 52px;
-        height: 52px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 18px;
-    `;
+    requestBtn.setAttribute('aria-label', 'Invite room to audio call');
 
     requestBtn.addEventListener('click', () => {
+        if (!socket.connected || !getJoinedRoom()) {
+            addNotification('Connect to a room before inviting others to audio.');
+            return;
+        }
         // Confirmation
         if (confirm('📢 Send a request for everyone in the room to join the call?')) {
             socket.emit('request-join-call');
-            addNotification('📡 Request sent to all users');
+            addNotification('📡 Audio invite requested for the room; delivery is not guaranteed.');
 
             // Visual feedback
             requestBtn.style.transform = 'scale(0.9)';
@@ -619,38 +639,12 @@ function addJoinCallButton() {
     // 2. Join/Leave Button
     const callBtn = document.createElement('button');
     callBtn.id = 'call-btn';
-    callBtn.innerHTML = `<i class="fas fa-phone"></i>`;
+    callBtn.innerHTML = `<i class="fas fa-phone" aria-hidden="true"></i><span class="audio-button-label">Join</span>`;
     callBtn.title = 'Join/Leave Audio Call';
-    callBtn.style.cssText = `
-        padding: 12px;
-        background: rgba(76, 175, 80, 0.6);
-        border: none;
-        border-radius: 50%;
-        cursor: pointer;
-        margin: 0 8px;
-        transition: all 0.3s ease;
-        backdrop-filter: blur(10px);
-        width: 52px;
-        height: 52px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 20px;
-    `;
-
+    callBtn.setAttribute('aria-label', 'Join audio call');
     callBtn.addEventListener('click', () => {
-        if (isInCall) {
-            leaveCall();
-            callBtn.style.background = 'rgba(76, 175, 80, 0.6)';
-            callBtn.innerHTML = `<i class="fas fa-phone"></i>`;
-            callBtn.title = 'Join Audio Call';
-        } else {
-            joinCall();
-            callBtn.style.background = 'rgba(244, 67, 54, 0.6)'; // Red
-            callBtn.innerHTML = `<i class="fas fa-phone-slash"></i>`;
-            callBtn.title = 'Leave Audio Call';
-        }
+        if (isInCall) leaveCall();
+        else joinCall();
     });
 
     // Insert before mic button

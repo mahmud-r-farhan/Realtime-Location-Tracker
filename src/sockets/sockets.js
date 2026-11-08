@@ -165,9 +165,8 @@ function isValidIceCandidate(candidate) {
 }
 
 module.exports = function setupSockets(io, connectedDevices, peers) {
-    // Require the signed session cookie issued by the web app before allowing a connection.
-    // This prevents unauthenticated clients (e.g. scripts hitting the socket endpoint directly)
-    // from connecting without ever obtaining a server-verified identity.
+    // Require a signed anonymous cookie issued by the web app. This is not
+    // user authentication: any visitor can obtain a cookie and choose a room.
     io.use((socket, next) => {
         if (verifySession(parseSessionCookie(socket.handshake.headers.cookie))) {
             return next();
@@ -178,6 +177,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
     io.on('connection', (socket) => {
         socket.clientIP = getClientIP(socket);
         socket.room = 'public';
+        socket.locationPaused = false;
         socket.join(roomChannel('public'));
 
         socket.on('join-room', (data) => {
@@ -218,7 +218,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
         });
 
         socket.on('send-location', (data) => {
-            if (!data || isRateLimited(socket, 'send-location')) return;
+            if (!data || socket.locationPaused || isRateLimited(socket, 'send-location')) return;
 
             if (data.latitude === undefined || data.longitude === undefined) {
                 return;
@@ -226,7 +226,8 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
 
             const lat = parseFloat(data.latitude);
             const lng = parseFloat(data.longitude);
-            const acc = parseFloat(data.accuracy) || 0;
+            const acc = data.accuracy == null ? NaN : Number(data.accuracy);
+            const capturedAt = Number(data.capturedAt);
 
             if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
                 return;
@@ -244,7 +245,10 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 latitude: lat,
                 longitude: lng,
                 deviceName: sanitizedDeviceName,
-                accuracy: Math.max(0, Math.min(acc, 10000)),
+                accuracy: Number.isFinite(acc) && acc >= 0 ? Math.min(acc, 100000) : null,
+                // The client clock is not authoritative; retain only plausible timestamps.
+                capturedAt: Number.isFinite(capturedAt) && capturedAt > 0 && capturedAt <= Date.now() + 60000
+                    ? new Date(capturedAt).toISOString() : null,
                 deviceInfo: sanitizeDeviceInfo(data.deviceInfo),
                 ip: socket.clientIP,
                 joinedAt: connectedDevices.get(socket.id)?.joinedAt || new Date(),
@@ -257,6 +261,27 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
 
             io.to(roomChannel(socket.room)).emit('receive-location', { id: socket.id, ...deviceData });
             broadcastRoomStats(io, connectedDevices, socket.room);
+        });
+
+        // Pausing only removes this socket's location; it must not end audio.
+        // Keep the flag on the server as well so a late location packet cannot
+        // republish a fix until the client explicitly resumes.
+        socket.on('stop-sharing-location', (callback) => {
+            socket.locationPaused = true;
+            const device = connectedDevices.get(socket.id);
+            connectedDevices.delete(socket.id);
+            if (device) {
+                io.to(roomChannel(socket.room)).emit('location-stopped', {
+                    id: socket.id, deviceName: device.deviceName
+                });
+                broadcastRoomStats(io, connectedDevices, socket.room);
+            }
+            if (typeof callback === 'function') callback({ success: true });
+        });
+
+        socket.on('resume-location-sharing', (callback) => {
+            socket.locationPaused = false;
+            if (typeof callback === 'function') callback({ success: true });
         });
 
         socket.on('request-device-location', (id) => {
@@ -329,12 +354,20 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             }
 
             const room = socket.room || 'public';
+            // New clients bind the alert to the room in which it was started.
+            // Keep older clients compatible, but never relay a mismatched alert.
+            if ((data.expectedRoom !== undefined && data.expectedRoom !== room) ||
+                (data.expectedSocketId !== undefined && data.expectedSocketId !== socket.id)) {
+                respond({ error: 'Room or connection changed before the alert was sent.' });
+                return;
+            }
             const rawSender = socket.deviceName || 'Unknown';
             const sanitizedSender = sanitizeString(rawSender, 50) || 'Unknown';
 
             const lat = parseFloat(data.location.latitude);
             const lng = parseFloat(data.location.longitude);
-            const acc = parseFloat(data.location.accuracy) || 0;
+            const acc = data.location.accuracy == null ? null : Number(data.location.accuracy);
+            const safeAccuracy = Number.isFinite(acc) && acc >= 0 ? Math.min(acc, 10000) : null;
 
             const validLocation = Number.isFinite(lat) && Number.isFinite(lng) &&
                 lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
@@ -348,12 +381,13 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 location: {
                     latitude: safeLat,
                     longitude: safeLng,
-                    accuracy: Math.max(0, Math.min(acc, 10000))
+                    accuracy: safeAccuracy
                 },
                 // False only when the sender explicitly reports no usable GPS
                 // fix; the alert is still relayed so people know there is an
                 // emergency even without coordinates.
                 locationAvailable: data.locationAvailable !== false && validLocation,
+                locationSource: ['fresh', 'cached', 'last-shared'].includes(data.locationSource) ? data.locationSource : 'unknown',
                 deviceInfo: sanitizeDeviceInfo(data.deviceInfo),
                 ipInfo: {
                     ip: socket.clientIP
