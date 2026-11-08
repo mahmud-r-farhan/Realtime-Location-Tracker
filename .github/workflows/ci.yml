@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     strategy:
       matrix:
@@ -29,13 +29,19 @@ jobs:
         run: npm run check
 
       - name: Run test suite
-        run: npm test
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee /tmp/tracker-test.log || {
+            python3 -c "import re; s=open('/tmp/tracker-test.log').read(); m=re.search(r'(?m)^\s*not ok.*',s); t=s[max(0,m.start()-100):m.start()+5000] if m else s[-5000:]; print('::error::'+t.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))"
+            exit 1
+          }
 
       - name: Audit dependencies
         run: npm audit
 
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,12 +50,18 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Install Chromium
-        run: npx playwright-core install --with-deps chromium
+        shell: bash
+        run: |
+          set -o pipefail
+          npx playwright-core install --with-deps chromium 2>&1 | tee /tmp/tracker-browser-install.log || {
+            python3 -c "s=open('/tmp/tracker-browser-install.log').read()[-5000:]; print('::error::'+s.replace('%','%25').replace('\r','%0D').replace('\n','%0A'))"
+            exit 1
+          }
       - name: Exercise responsive workspace
         run: npm run test:browser
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Build image
