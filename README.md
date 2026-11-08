@@ -8,6 +8,10 @@ A high-performance, real-time geolocation tracker and communication platform bui
 
 ---
 
+[![clean-browser-mockup.jpg](https://i.postimg.cc/C53q0ZWm/clean-browser-mockup.jpg)](https://postimg.cc/T5cwqP2D)
+[![clean-browser-mockup-(1).jpg](https://i.postimg.cc/8CZf5X2r/clean-browser-mockup-(1).jpg)](https://postimg.cc/QBWdYmxX)
+
+
 > [!IMPORTANT]
 > **Safety and Privacy Notice:**
 > - **Not an Emergency Service:** The built-in SOS feature relays alerts strictly across connected members within the same room. Server acknowledgement confirms broadcast receipt only; it is **not** connected to 911/emergency dispatch services. In real emergencies, always contact local emergency responders directly.
