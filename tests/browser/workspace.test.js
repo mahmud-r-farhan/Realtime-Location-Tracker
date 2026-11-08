@@ -727,3 +727,53 @@ test('manifest references correctly sized PNG install icons', async () => {
         assert.equal(bytes.readUInt32BE(20), size);
     }
 });
+
+test('two browser peers negotiate audio when the answering microphone is muted during an offer', async () => {
+    const browser = await chromium.launch({
+        headless: true,
+        executablePath: process.env.CHROMIUM_PATH || undefined,
+        args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', ...(process.env.CHROMIUM_PATH ? ['--single-process', '--no-zygote'] : [])]
+    });
+    try {
+        const contexts = await Promise.all([0, 1].map(() => browser.newContext({
+            permissions: ['microphone', 'geolocation'],
+            geolocation: { latitude: 23.8, longitude: 90.4 },
+            serviceWorkers: 'block', reducedMotion: 'reduce'
+        })));
+        const [first, second] = await Promise.all(contexts.map(context => context.newPage()));
+        for (const page of [first, second]) {
+            page.setDefaultTimeout(15000);
+            await page.route(/https:\/\//, route => route.abort());
+        }
+        await second.addInitScript(() => {
+            const original = RTCPeerConnection.prototype.setRemoteDescription;
+            RTCPeerConnection.prototype.setRemoteDescription = async function(description) {
+                if (description?.type === 'offer') {
+                    await new Promise(resolve => { window.releaseTestOffer = resolve; });
+                }
+                return original.call(this, description);
+            };
+        });
+        for (const page of [first, second]) await page.goto(url, { waitUntil: 'domcontentloaded' });
+        for (const [page, name] of [[first, 'First'], [second, 'Second']]) {
+            await page.locator('#user-name-input').fill(name);
+            await page.locator('#org-input').fill('audio-regression');
+            await page.locator('#continue-btn').click();
+            await page.waitForFunction(() => document.getElementById('current-room').textContent === 'audio-regression');
+            await page.locator('#sidebar-toggle').click();
+        }
+        await first.locator('#mic-btn').click();
+        await first.locator('#mic-btn[aria-label="Mute microphone"]').waitFor();
+        await second.locator('#mic-btn').click();
+        await second.locator('#mic-btn[aria-label="Mute microphone"]').waitFor();
+        await second.waitForFunction(() => typeof window.releaseTestOffer === 'function');
+        await second.locator('#mic-btn').click();
+        await second.locator('#mic-btn[aria-label="Unmute microphone"]').waitFor();
+        await second.evaluate(() => window.releaseTestOffer());
+        await first.waitForFunction(() => [...document.querySelectorAll('audio[id^="remote-audio-"]')].some(audio => audio.srcObject?.getAudioTracks().length));
+        await second.waitForFunction(() => [...document.querySelectorAll('audio[id^="remote-audio-"]')].some(audio => audio.srcObject?.getAudioTracks().length));
+        await second.locator('#mic-btn').click();
+        await second.locator('#mic-btn[aria-label="Mute microphone"]').waitFor();
+        assert.ok(await first.evaluate(() => [...document.querySelectorAll('audio[id^="remote-audio-"]')].some(audio => audio.srcObject.getAudioTracks().some(track => track.readyState === 'live'))));
+    } finally { await browser.close(); }
+});
