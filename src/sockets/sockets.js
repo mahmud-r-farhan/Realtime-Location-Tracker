@@ -505,7 +505,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             if (wasInAudio) {
                 io.to(roomChannel(room)).emit('user-disconnected', {
                     peerId: socket.id,
-                    userName: (deviceData && deviceData.deviceName) || 'Unknown'
+                    userName: (deviceData && deviceData.deviceName) || socket.deviceName || 'Unknown'
                 });
             }
 

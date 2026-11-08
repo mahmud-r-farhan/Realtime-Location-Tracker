@@ -1,7 +1,40 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
 const { chromium } = require('playwright-core');
 const { server } = require('../../src/app');
+
+// Auto-detect system browser if CHROMIUM_PATH is not explicitly provided
+if (!process.env.CHROMIUM_PATH) {
+    const candidates = [];
+    if (process.platform === 'win32') {
+        candidates.push(
+            'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+            'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+            'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+            process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe` : ''
+        );
+    } else if (process.platform === 'darwin') {
+        candidates.push(
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium'
+        );
+    } else {
+        candidates.push(
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser'
+        );
+    }
+    for (const p of candidates) {
+        if (p && fs.existsSync(p)) {
+            process.env.CHROMIUM_PATH = p;
+            break;
+        }
+    }
+}
 
 let url;
 before(async () => {

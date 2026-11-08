@@ -231,14 +231,17 @@ function openProfileEditor() {
     if (description) description.textContent = 'Update your name or switch to another room.';
     cancelBtn?.classList.remove('hidden');
     showNamePopup();
-    const closeEditor = () => {
-        hideNamePopup();
-        cancelBtn?.classList.add('hidden');
-        document.removeEventListener('keydown', onEscape);
-        if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus();
-    };
+    let closeEditor;
     const onEscape = event => { if (event.key === 'Escape') closeEditor(); };
+    const onEnterKey = event => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            handleSave();
+        }
+    };
     document.addEventListener('keydown', onEscape);
+    nameInput.addEventListener('keydown', onEnterKey);
+    orgInput.addEventListener('keydown', onEnterKey);
     if (cancelBtn) cancelBtn.onclick = closeEditor;
 
     const handleSave = () => {
@@ -249,6 +252,15 @@ function openProfileEditor() {
         addNotification('✅ Profile updated!');
 
         closeEditor();
+    };
+
+    closeEditor = () => {
+        hideNamePopup();
+        cancelBtn?.classList.add('hidden');
+        document.removeEventListener('keydown', onEscape);
+        nameInput.removeEventListener('keydown', onEnterKey);
+        orgInput.removeEventListener('keydown', onEnterKey);
+        if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus();
     };
 
     // Remove previous listeners (cloning node is a dirty but effective reset).

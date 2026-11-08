@@ -1,129 +1,129 @@
 # Realtime Location Tracker
 
-> A high-performance, real-time geolocation tracking system built with Node.js, Express, Socket.IO, and Leaflet.js.
+> A high-performance, real-time geolocation tracking system built with Node.js, Express, Socket.IO, Leaflet.js, and WebRTC.
 
 ## Overview
 
-The Realtime Location Tracker is a lightweight web application designed to capture real-time spatial updates via HTML5 Geolocation APIs and transmit coordinate shifts instantaneously using WebSockets (`Socket.IO`). Connected client locations are plotted dynamically on an interactive map rendered via `Leaflet.js` and `OpenStreetMap`.
+The Realtime Location Tracker is a modular web application designed to capture real-time spatial updates via HTML5 Geolocation APIs and transmit coordinates and metadata securely using WebSockets (`Socket.IO`). Connected client locations are plotted dynamically on an interactive map rendered via `Leaflet.js` with support for multiple tile layers (OpenStreetMap, Satellite, Dark Mode, Topo, CyclOSM, etc.), room-scoped live chat, peer-to-peer WebRTC voice calling, battery monitoring, emergency SOS alerts, and progressive web application (PWA) offline capabilities.
 
 ## Key Features
 
-- **Realtime Bidirectional Communication:** Low-latency WebSocket connections via Socket.IO for streaming spatial coordinates.
-- **Client-Side Geolocation:** Uses `navigator.geolocation.watchPosition` for continuous device tracking.
-- **Interactive Mapping:** Interactive map visualization powered by Leaflet.js with customized marker management.
-- **Dynamic Session Handling:** Automatic marker spawning when users connect and marker removal on socket disconnect.
+- **Realtime Bidirectional Communication:** Low-latency WebSocket connections via Socket.IO with HMAC-signed session verification and per-event sliding window rate limiting.
+- **Adaptive Geolocation Tracking:** Intelligent geolocation polling with accelerometer-driven motion detection (switches between active and idle modes to conserve battery).
+- **Interactive Mapping:** Interactive map visualization powered by Leaflet.js with customized, accessible high-contrast device markers, accuracy estimates, and fit-bounds.
+- **Room Scoping & Privacy:** Namespace-isolated rooms (default `public`), easy invite sharing via link, and instant location pause/resume controls.
+- **Room-Scoped Chat:** Real-time text messaging with sender attribution and click-to-focus on the map.
+- **P2P Voice Communication:** WebRTC mesh audio calling with microphone mute/unmute and room invite announcements.
+- **Emergency SOS Relay:** Hold-to-trigger emergency alert relay with multiple location fallbacks, honest delivery indicators, and audio/visual alerts.
+- **Fleet Battery Monitoring:** Real-time tracking of device battery levels and charging states with low/critical power alerts.
+- **Progressive Web App (PWA):** Service worker precaching, offline fallback notice page, and installation support across desktop and mobile.
 
 ## Tech Stack
 
 ### Backend & Middleware
-- **Runtime:** Node.js
-- **Framework:** Express.js (HTTP server hosting & static asset delivery)
-- **Realtime Layer:** Socket.IO (Server instance)
+- **Runtime:** Node.js (v18+ recommended, v20/v22 LTS supported)
+- **Framework:** Express.js (HTTP server hosting & static asset delivery with compression, helmet CSP, and rate limiting)
+- **Realtime Layer:** Socket.IO v4 (WebSocket transport with CORS controls and HMAC-signed session authorization)
 - **View Engine:** EJS (Embedded JavaScript)
 
 ### Frontend & Client Tools
-- **Mapping Library:** Leaflet.js
-- **Tiles Provider:** OpenStreetMap Tile Layer (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`)
-- **Realtime Client:** Socket.IO Client SDK
-- **Geolocation API:** Browser-native HTML5 Geolocation API
+- **Mapping Library:** Leaflet.js (Self-hosted assets)
+- **Tiles Providers:** OpenStreetMap, Esri Satellite, CartoDB Dark/Light/Voyager, OpenTopoMap, CyclOSM
+- **Realtime Client:** Socket.IO Client SDK v4
+- **Audio / Signaling:** WebRTC (RTCPeerConnection + STUN servers)
+- **Styling & Fonts:** Responsive CSS with Glassmorphism, CSS Custom Properties, and self-hosted Font Awesome 6
+- **Storage:** LocalStorage for user preferences (theme, profile, paused sharing state, SOS local history)
 
 ## Architecture & Data Flow
 
 1. **Connection Initialization:**
-   - Client accesses the HTTP server via Express.
-   - Server renders the EJS template containing the map canvas and client scripts.
-   - Client establishes a persistent WebSocket connection to the Socket.IO server.
+   - Client requests `/` via HTTP; Express validates or signs an anonymous session cookie (`sid`) using HMAC-SHA256.
+   - Server renders the EJS template containing the map canvas, UI controls, and client modules.
+   - Client opens an authenticated WebSocket upgrade using the signed session cookie.
+   - Client emits `join-room` with room name and nickname.
 
 2. **Position Tracking & Emission:**
-   - Client requests high-accuracy location tracking (`enableHighAccuracy: true`).
-   - On position change, client emits a `send-location` event containing `{ latitude, longitude }`.
+   - Geolocation coordinates are captured using `navigator.geolocation.getCurrentPosition`.
+   - Motion detection adjusts polling between active (`LOCATION_SEND_INTERVAL` = 2s) and stationary (`LOCATION_IDLE_INTERVAL` = 30s).
+   - Minimal movement threshold (8m) avoids redundant updates.
+   - Client emits `send-location` with latitude, longitude, estimated accuracy, and sanitized device info.
 
 3. **Broadcasting & Rendering:**
-   - Server listens for `send-location` and broadcasts `{ id: socket.id, latitude, longitude }` to all connected clients (`io.emit`).
-   - Every client receives the coordinates and updates/creates the corresponding marker in the `Leaflet` layer map.
+   - Server verifies coordinates, rate limits, and broadcasts to room members via `receive-location`.
+   - Connected clients update their local `markers` map dictionary and room device lists.
 
-4. **Disconnection Lifecycle:**
-   - On connection termination, server emits `user-disconnected` containing the `socket.id`.
-   - Clients capture this event and remove the corresponding marker layer from the map.
+4. **Emergency SOS & Audio Signaling:**
+   - SOS alerts are relayed to connected room members with server-verified timestamps, IP info, and delivery acknowledgements.
+   - WebRTC SDP offers/answers and ICE candidates are validated and forwarded between audio participants in the room.
+
+5. **Disconnection Lifecycle:**
+   - On disconnect or room leave, server emits `user-disconnect` and `user-disconnected`.
+   - Client cleans up map marker pins and closes peer audio connections.
 
 ## File Structure
 
 ```text
 Realtime-Location-Tracker/
 ├── public/
-│   ├── js/
-│   │   └── script.js      # Client-side Socket.IO & Leaflet map logic
-│   └── css/
-│       └── style.css       # Map viewport styling and DOM layout
-├── views/
-│   └── index.ejs          # HTML structure loading Socket.IO, Leaflet, and scripts
-├── app.js                 # Express server & Socket.IO initialization
-├── package.json           # Dependencies and runtime scripts
+│   ├── assets/            # Device icons, favicons, audio icons, and graphics
+│   ├── css/               # Modular CSS (workspace, panel, device, chat, audio, sos, etc.)
+│   ├── js/                # ES modules (main, map, socket, controls, audio, chat, sos, etc.)
+│   ├── vendor/            # Self-hosted Leaflet and Font Awesome
+│   ├── manifest.json      # PWA manifest
+│   ├── offline.html       # Offline fallback page
+│   └── sw.js              # Service Worker implementation
+├── src/
+│   ├── middleware/        # Express middleware (Helmet, CSP, Compression, Rate Limit)
+│   ├── routes/            # HTTP routes (/health, /, /developer, session verification)
+│   ├── sockets/           # Socket.IO handlers, validation, rate limiting, and room logic
+│   ├── views/             # EJS templates (index.ejs, 404.ejs, error.ejs)
+│   └── app.js             # Express app & HTTP/Socket.IO server bootstrap
+├── tests/
+│   ├── routes.test.js     # HTTP routes and session signing tests
+│   ├── sockets.test.js    # Socket.IO event handler and security tests
+│   └── browser/           # Playwright responsive workspace interaction tests
+├── scripts/
+│   ├── check-syntax.js    # Cross-platform JavaScript syntax validator
+│   └── check-syntax.sh    # Shell wrapper for CI
+├── Dockerfile             # Production container definition
+├── docker-compose.yml     # Container orchestration
+├── package.json           # Project manifest and scripts
+├── AUDIT.md               # Security audit and engineering notes
 └── README.md              # Documentation
-
 ```
 
 ## Setup & Running Instructions
 
 ### Prerequisites
+- Node.js (v18.x, v20.x, or v22.x)
+- npm (v9+)
 
--   Node.js (v14+ recommended)
-    
-      
-    
--   npm or yarn
-    
-      
-    
-
-### Installation
-
-Bash
-
-```
+### Installation & Test
+```bash
 # Clone the repository
-git clone [https://github.com/mahmud-r-farhan/Realtime-Location-Tracker.git](https://github.com/mahmud-r-farhan/Realtime-Location-Tracker.git)
-
-# Navigate into project directory
+git clone https://github.com/mahmud-r-farhan/Realtime-Location-Tracker.git
 cd Realtime-Location-Tracker
 
-# Install dependencies
-npm install
+# Install dependencies cleanly
+npm ci
 
+# Run syntax check across all JavaScript files
+npm run check
+
+# Run unit and integration tests
+npm test
+
+# Run browser interaction tests
+npm run test:browser
 ```
 
 ### Execution
-
-Bash
-
-```
-# Start the application
+```bash
+# Start in production mode
 npm start
-# or using nodemon for development
-npx nodemon app.js
 
+# Or development mode with auto-reload
+npm run dev
 ```
 
-By default, the server runs on `http://localhost:3000`.
-
-  
-
-## Code Conventions & Standards
-
--   **Asynchronous Events:** Rely on Socket.IO event-driven architecture rather than polling.
-    
-      
-    
--   **Memory Safety:** Ensure markers are mapped to `socket.id` dictionary keys on the client to allow `O(1)` deletion and prevent client-side memory leaks on long-running sessions.
-    
-      
-    
--   **Client Configuration:** Set `timeout` and `maximumAge` parameters on `watchPosition` to ensure location freshness while conserving client system resources.
-    
-
-```
-
-<ElicitationsGroup message="Next steps to enhance this repository:">
-  <Elicitation label="Create an llms-full.txt with complete code references" query="Please provide an llms-full.txt file for my Realtime Location Tracker project including the complete implementation details for app.js, script.js, and index.ejs."/>
-  <Elicitation label="Add project optimization & performance tips" query="What architectural or code optimizations can I make to scale this Realtime Location Tracker for higher concurrent connections?"/>
-</ElicitationsGroup>
+Default server port: `http://localhost:3007` (configurable via `PORT` environment variable).

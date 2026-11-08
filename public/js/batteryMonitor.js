@@ -18,6 +18,7 @@ const deviceBatteries = new Map();
 
 // UI elements
 let batteryPanelElement = null;
+let returnFocusElement = null;
 
 export function updateDeviceBattery(deviceId, deviceName, batteryInfo) {
     if (!batteryInfo || typeof batteryInfo.level !== 'number') return;
@@ -141,26 +142,43 @@ function getBatteryClass(level, charging) {
  * Create battery panel HTML
  */
 function createBatteryPanel() {
-    if (document.getElementById('battery-panel')) return;
+    if (document.getElementById('battery-panel-modal')) return;
 
-    const panel = document.createElement('div');
-    panel.id = 'battery-panel';
-    panel.className = 'battery-panel hidden';
-    panel.innerHTML = `
-        <div class="battery-panel-header">
-            <h3>🔋 Battery Status</h3>
-            <button id="close-battery-panel" class="close-btn">&times;</button>
-        </div>
-        <div class="battery-panel-content">
-            <div id="battery-list" class="battery-list"></div>
+    const modal = document.createElement('div');
+    modal.id = 'battery-panel-modal';
+    modal.className = 'battery-modal hidden';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'battery-panel-title');
+    modal.innerHTML = `
+        <div class="battery-panel" id="battery-panel">
+            <div class="battery-panel-header">
+                <h3 id="battery-panel-title">🔋 Fleet Battery Status</h3>
+                <button id="close-battery-panel" class="close-btn" aria-label="Close battery status">&times;</button>
+            </div>
+            <div class="battery-panel-content">
+                <div id="battery-list" class="battery-list"></div>
+            </div>
         </div>
     `;
 
-    document.body.appendChild(panel);
-    batteryPanelElement = panel;
+    document.body.appendChild(modal);
+    batteryPanelElement = modal;
 
     // Close button handler
     document.getElementById('close-battery-panel').addEventListener('click', closeBatteryPanel);
+
+    // Click outside on backdrop to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeBatteryPanel();
+    });
+
+    // Escape key to close
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            closeBatteryPanel();
+        }
+    });
 
     addBatteryStyles();
 }
@@ -179,6 +197,7 @@ function updateBatteryPanel() {
             <div class="battery-empty">
                 <span>🔋</span>
                 <p>No battery data available</p>
+                <small>Battery levels are shared automatically when supported by room devices.</small>
             </div>
         `;
         return;
@@ -216,9 +235,11 @@ function formatTimeSince(timestamp) {
  * Open battery panel
  */
 export function openBatteryPanel() {
+    returnFocusElement = document.activeElement;
     createBatteryPanel();
     updateBatteryPanel();
     batteryPanelElement.classList.remove('hidden');
+    document.getElementById('close-battery-panel')?.focus();
 }
 
 /**
@@ -227,6 +248,10 @@ export function openBatteryPanel() {
 export function closeBatteryPanel() {
     if (batteryPanelElement) {
         batteryPanelElement.classList.add('hidden');
+        if (returnFocusElement && typeof returnFocusElement.focus === 'function') {
+            returnFocusElement.focus();
+        }
+        returnFocusElement = null;
     }
 }
 
@@ -239,34 +264,46 @@ function addBatteryStyles() {
     const style = document.createElement('style');
     style.id = 'battery-styles';
     style.textContent = `
-        .battery-panel {
+        .battery-modal {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            max-width: 400px;
-            max-height: 80vh;
-            background: var(--card-bg, #fff);
-            border-radius: 16px;
-            box-shadow: 0 20px 50px var(--shadow-color, rgba(0,0,0,0.2));
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             z-index: 10001;
-            overflow: hidden;
-            animation: slideUp 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
         }
 
-        .battery-panel.hidden {
+        .battery-modal.hidden {
             display: none;
+        }
+
+        .battery-panel {
+            width: 100%;
+            max-width: 420px;
+            max-height: 80vh;
+            background: var(--card-bg, #fff);
+            color: var(--text-primary, #0f172a);
+            border: 1px solid var(--border-color, rgba(0,0,0,0.1));
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease;
         }
 
         @keyframes slideUp {
             from {
                 opacity: 0;
-                transform: translate(-50%, -45%);
+                transform: translateY(20px) scale(0.97);
             }
             to {
                 opacity: 1;
-                transform: translate(-50%, -50%);
+                transform: translateY(0) scale(1);
             }
         }
 
@@ -434,6 +471,10 @@ export function initBatteryMonitor() {
     // Clean up on user disconnect
     socket.on('user-disconnect', (data) => {
         removeDeviceBattery(data.peerId);
+    });
+
+    document.getElementById('view-battery-btn')?.addEventListener('click', () => {
+        openBatteryPanel();
     });
 
     console.log('🔋 Battery monitor initialized');

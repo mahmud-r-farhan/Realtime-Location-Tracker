@@ -7,7 +7,7 @@
     "start": "node src/app.js",
     "dev": "node --watch src/app.js",
     "test": "node --test tests/*.test.js",
-    "check": "sh scripts/check-syntax.sh",
+    "check": "node scripts/check-syntax.js",
     "test:browser": "node --test tests/browser/*.test.js"
   },
   "keywords": [

@@ -3,7 +3,7 @@
 export function initDialogFocus() {
     document.addEventListener('keydown', event => {
         if (event.key !== 'Tab') return;
-        const dialog = ['name-popup', 'sos-modal', 'layer-selector-modal']
+        const dialog = ['name-popup', 'sos-modal', 'layer-selector-modal', 'battery-panel-modal']
             .map(id => document.getElementById(id))
             .find(element => element && !element.classList.contains('hidden'));
         if (!dialog) return;
