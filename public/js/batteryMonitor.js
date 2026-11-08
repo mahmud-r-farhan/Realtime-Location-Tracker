@@ -419,16 +419,16 @@ function addBatteryStyles() {
  * Initialize battery monitoring
  */
 export function initBatteryMonitor() {
-    // Request notification permission for battery alerts
-    if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-
+    // Use browser notifications only when permission was already granted.
     // Listen for location updates to extract battery info
     socket.on('receive-location', (data) => {
         if (data.deviceInfo && data.deviceInfo.battery) {
             updateDeviceBattery(data.id, data.deviceName, data.deviceInfo.battery);
         }
+    });
+
+    socket.on('location-stopped', (data) => {
+        removeDeviceBattery(data.id);
     });
 
     // Clean up on user disconnect

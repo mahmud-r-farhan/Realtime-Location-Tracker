@@ -1,9 +1,9 @@
 // Service Worker for Realtime Location Tracker PWA
 // NOTE: bump the cache versions whenever precached assets change, so all
 // clients pick up the new files (old caches are purged on activation).
-const CACHE_NAME        = 'location-tracker-v4';
-const STATIC_CACHE_NAME = 'static-cache-v4';
-const DYNAMIC_CACHE_NAME= 'dynamic-cache-v4';
+const CACHE_NAME        = 'location-tracker-v5-review-202611';
+const STATIC_CACHE_NAME = 'static-cache-v5-review-202611';
+const DYNAMIC_CACHE_NAME= 'dynamic-cache-v5-review-202611';
 
 // Assets to cache immediately on install - includes the full ES-module graph
 // (main.js imports every other module, so all of them are required offline).
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
     '/css/responsive.css',
     '/css/icon.css',
     '/css/sos.css',
+    '/css/workspace.css',
     '/vendor/leaflet/leaflet.js',
     '/vendor/leaflet/leaflet.css',
     '/vendor/font-awesome/all.min.css',
@@ -26,6 +27,7 @@ const STATIC_ASSETS = [
     '/vendor/font-awesome/webfonts/fa-regular-400.woff2',
     '/vendor/font-awesome/webfonts/fa-brands-400.woff2',
     '/js/main.js',
+    '/js/dialogs.js',
     '/js/config.js',
     '/js/utils.js',
     '/js/map.js',
@@ -43,6 +45,7 @@ const STATIC_ASSETS = [
     '/js/sos.js',
     '/js/pwa.js',
     '/assets/favico.png',
+    '/assets/workspace-location.jpg',
     '/assets/android-log.png',
     '/assets/ios-log.png',
     '/assets/windows-log.png',
@@ -62,6 +65,8 @@ const STATIC_ASSETS = [
     '/assets/speaker-off-icon.png',
     '/assets/icons8-location.gif',
     '/assets/icons/icon.svg',
+    '/assets/icons/pwa-192.png',
+    '/assets/icons/pwa-512.png',
     '/manifest.json',
     '/offline.html'
 ];
@@ -115,7 +120,8 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames
                     .filter((name) => {
-                        return name !== STATIC_CACHE_NAME &&
+                        return /^(location-tracker|static-cache|dynamic-cache)-v/.test(name) &&
+                            name !== STATIC_CACHE_NAME &&
                             name !== DYNAMIC_CACHE_NAME &&
                             name !== CACHE_NAME;
                     })
@@ -156,7 +162,7 @@ self.addEventListener('fetch', (event) => {
                 return fetch(request)
                     .then((response) => {
                         if (response.ok) {
-                            cache.put(request, response.clone());
+                            event.waitUntil(cache.put(request, response.clone()).then(() => trimCache(DYNAMIC_CACHE_NAME, MAX_DYNAMIC_CACHE_ENTRIES)));
                         }
                         return response;
                     })
@@ -166,29 +172,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // For navigation requests (HTML pages), use network first
+    // The app shell needs the live Socket.IO client and cannot function as an
+    // offline tracker. Show the honest fallback rather than a broken cached
+    // page or a stale room view when the server cannot be reached.
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request)
-                .then((response) => {
-                    // Cache the successful response
-                    if (response.ok) {
-                        const responseClone = response.clone();
-                        caches.open(STATIC_CACHE_NAME).then((cache) => {
-                            cache.put(request, responseClone);
-                        });
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    // If offline, try to serve cached page or offline fallback
-                    return caches.match(request).then((cachedResponse) => {
-                        if (cachedResponse) {
-                            return cachedResponse;
-                        }
-                        return caches.match('/offline.html');
-                    });
-                })
+            fetch(request).catch(async () => (await caches.match('/offline.html')) ||
+                new Response('Tracker unavailable. Live tracking and SOS require a connection.', {
+                    status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+                }))
         );
         return;
     }

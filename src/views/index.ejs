@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
     <!-- SEO Meta Tags -->
     <title>Real-Time Location Tracker - Track & Monitor Live Locations</title>
@@ -64,6 +64,7 @@
     <link rel="stylesheet" href="/css/responsive.css">
     <link rel="stylesheet" href="/css/icon.css">
     <link rel="stylesheet" href="/css/sos.css">
+    <link rel="stylesheet" href="/css/workspace.css">
 
     <!-- Canonical URL -->
     <link rel="canonical" href="https://realtime-location-tracker-v9ow.onrender.com/">
@@ -73,47 +74,99 @@
 </head>
 
 <body>
-    <div id="map"></div>
+    <div id="map" aria-label="Live location map"></div>
     <div id="sos-overlay"></div>
-    <div id="sidebar" class="collapsed">
-        <div id="sidebar-toggle">
-            <i class="fas fa-chevron-left"></i>
-        </div>
-        <div id="info-panel">
-            <div class="Connected-Devices">
-                <h2>Connected Devices</h2>
-                <h3 id="user-count">0</h3>
-            </div>
-            <ul id="device-list"></ul>
-            <div id="room-actions" class="room-actions">
-                <button id="copy-invite-btn" class="copy-invite-btn">
-                    <i class="fas fa-link"></i> Copy Room Invite
-                </button>
-            </div>
-            <div id="audio-controls">
-                <button id="mic-btn">
-                    <img src="/assets/microphone-muted-icon.png" alt="Microphone">
-                </button>
-                <button id="speaker-btn">
-                    <img src="/assets/speaker-on-icon.png" alt="Speaker">
-                </button>
-            </div>
-        </div>
+    <div id="map-tile-warning" class="map-tile-warning hidden" role="status" aria-live="polite">
+        <i class="fas fa-map" aria-hidden="true"></i>
+        <span><strong>Map tiles unavailable</strong><small>Check your connection or try another map style.</small></span>
+        <button id="retry-map-tiles" type="button">Retry</button>
     </div>
-    <div id="name-popup" class="hidden">
-        <div class="popup-content">
-            <h2>Welcome to Real-Time Location Tracker
-                <img src="/assets/icons8-location.gif" style="width: 26px; height: auto;" alt="icon-gif">
-            </h2>
-            <p>Assigned name:</p>
-            <input type="text" id="user-name-input" placeholder="Enter Name (optional)">
 
-            <p style="margin-top: 15px;">Organization / Crew ID:</p>
-            <input type="text" id="org-input" placeholder="e.g. Fleet1 (Leave empty for Public)">
+    <header class="workspace-header" aria-label="Tracker status">
+        <div class="brand-mark" aria-hidden="true"><i class="fas fa-location-arrow"></i></div>
+        <div class="brand-copy">
+            <span class="brand-eyebrow">REAL-TIME LOCATION TRACKER</span>
+            <strong>Stay in the loop<span class="brand-period">.</span></strong>
+        </div>
+        <div class="workspace-divider" aria-hidden="true"></div>
+        <div class="workspace-meta">
+            <span class="workspace-meta-label">YOUR ROOM</span>
+            <span id="current-room" class="workspace-room">Public</span>
+        </div>
+        <div class="connection-status" id="connection-status" role="status" aria-live="polite" data-state="connecting">
+            <span class="status-dot" aria-hidden="true"></span><span id="connection-label">Connecting</span>
+        </div>
+    </header>
 
-            <div class="popup-buttons">
-                <button id="continue-btn">Continue</button>
+    <aside id="sidebar" class="collapsed" aria-label="Devices and audio">
+        <button id="sidebar-toggle" type="button" aria-controls="info-panel" aria-expanded="false" aria-label="Open devices panel">
+            <i class="fas fa-chevron-left" aria-hidden="true"></i><span>Devices</span>
+        </button>
+        <div id="info-panel" inert>
+            <div class="sidebar-heading">
+                <div><span class="section-eyebrow">YOUR ROOM</span><h2>Devices</h2></div>
+                <span class="sidebar-heading-icon" aria-hidden="true"><i class="fas fa-satellite-dish"></i></span>
             </div>
+            <p class="sidebar-description">Sharing locations in <strong id="sidebar-room">Public</strong></p>
+            <section class="sharing-card" aria-labelledby="sharing-heading">
+                <div class="sharing-card-header">
+                    <div><span class="section-eyebrow">YOUR LOCATION</span><h3 id="sharing-heading">Location sharing</h3></div>
+                    <span class="sharing-indicator" id="sharing-indicator" data-state="waiting" role="status" aria-live="polite">Waiting</span>
+                </div>
+                <p id="sharing-description">Waiting to join the room.</p>
+                <div class="sharing-actions"><button id="sharing-toggle" class="sharing-toggle" type="button" aria-pressed="true">Pause sharing</button><button id="sharing-retry" class="sharing-retry hidden" type="button">Try again</button></div>
+                <small>SOS can still request and share your location while paused.</small>
+            </section>
+            <section class="devices-section" aria-labelledby="room-devices-heading">
+                <div class="devices-section-heading">
+                    <div><span class="section-eyebrow">ROOM DEVICES</span><h3 id="room-devices-heading">Locations</h3></div>
+                    <div class="device-count"><span id="user-count">—</span><span>sharing</span></div>
+                </div>
+                <p class="devices-section-description">Select a device to find it on the map.</p>
+                <button id="fit-devices-btn" class="fit-devices-btn" type="button" disabled><i class="fas fa-expand" aria-hidden="true"></i> Show all on map</button>
+                <div id="device-empty" class="device-empty">
+                    <span class="device-empty-icon" aria-hidden="true"><i class="fas fa-map-marker-alt"></i></span>
+                    <span><strong id="device-empty-title">Connecting</strong><span id="device-empty-description">Waiting for the room’s location list.</span></span>
+                </div>
+                <ul id="device-list" aria-label="Devices sharing their location"></ul>
+                <p class="devices-fix-note"><i class="fas fa-info-circle" aria-hidden="true"></i><span>Fix times and accuracy are estimates from each device.</span></p>
+            </section>
+            <div id="room-actions" class="room-actions">
+                <div class="room-actions-heading"><span class="section-eyebrow">ROOM ACCESS</span><i class="fas fa-link" aria-hidden="true"></i></div>
+                <button id="copy-invite-btn" class="copy-invite-btn" type="button" disabled>
+                    <i class="fas fa-link" aria-hidden="true"></i> Copy room invite
+                </button>
+                <p id="invite-status" role="status" aria-live="polite">Connect to share a room invite.</p>
+            </div>
+            <div class="audio-section">
+                <div class="list-heading"><span>ROOM AUDIO</span><i class="fas fa-headphones" aria-hidden="true"></i></div>
+                <p>Connect with your room in real time.</p>
+                <div id="audio-controls">
+                    <button id="mic-btn" type="button" aria-label="Join call or toggle microphone" title="Join call or toggle microphone">
+                        <i class="fas fa-microphone-slash audio-control-icon" aria-hidden="true"></i><span class="audio-button-label">Mic off</span>
+                    </button>
+                    <button id="speaker-btn" type="button" aria-label="Mute speaker" title="Mute speaker" aria-pressed="true">
+                        <i class="fas fa-volume-up audio-control-icon" aria-hidden="true"></i><span class="audio-button-label">Sound on</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+    <div id="name-popup" class="hidden" role="dialog" aria-modal="true" aria-labelledby="welcome-title" aria-describedby="welcome-description">
+        <div class="popup-content">
+            <button id="profile-cancel" class="profile-cancel hidden" type="button" aria-label="Close profile editor">×</button>
+            <div class="welcome-art" aria-hidden="true"></div>
+            <div class="welcome-mark" aria-hidden="true"><i class="fas fa-location-arrow"></i></div>
+            <span class="section-eyebrow">WELCOME TO YOUR WORKSPACE</span>
+            <h1 id="welcome-title">Better together,<br><span>wherever you are.</span></h1>
+            <p id="welcome-description" class="welcome-description">Share your location and stay connected with your people in one place.</p>
+            <label for="user-name-input">Your name <span>OPTIONAL</span></label>
+            <input type="text" id="user-name-input" maxlength="50" autocomplete="nickname" placeholder="How should we call you?">
+            <label for="org-input">Room name <span>OPTIONAL</span></label>
+            <input type="text" id="org-input" maxlength="50" autocomplete="off" placeholder="e.g. Weekend crew">
+            <p class="room-hint"><i class="fas fa-info-circle" aria-hidden="true"></i> Leave blank to join the public room. Room names are not private; anyone who knows one can join.</p>
+            <div class="popup-buttons"><button id="continue-btn" type="button">Continue to map <i class="fas fa-arrow-right" aria-hidden="true"></i></button></div>
+            <p class="welcome-footnote"><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Your browser will ask before sharing your location.</p>
         </div>
     </div>
 
@@ -121,33 +174,35 @@
         <div class="notification-header">
             <div class="drag-handle">
                 <i class="fas fa-grip-lines"></i>
-                <span>Activity Logs</span>
+                <span>Activity</span><span id="activity-unread" class="activity-unread hidden" aria-label="Unread activity">0</span>
             </div>
-            <button id="notification-toggle">+</button>
+            <button id="notification-toggle" type="button" aria-label="Show activity" aria-controls="notification-content" aria-expanded="false">+</button>
         </div>
-        <div class="notification-content">
-            <ul id="notification-list"></ul>
+        <div class="notification-content" id="notification-content">
+            <div class="activity-toolbar"><span>Recent updates</span><button type="button" id="clear-activity">Clear</button></div>
+            <p id="activity-empty" class="activity-empty">No activity yet.</p>
+            <ul id="notification-list" role="log" aria-label="Recent activity" aria-live="polite"></ul>
         </div>
     </div>
 
     <div id="chat-panel" class="hidden">
         <div class="chat-header">
-            <span id="chat-title">Group Chat</span>
-            <button id="close-chat">×</button>
+            <span id="chat-title">Room chat <small>Messages for your room</small></span>
+            <button id="close-chat" type="button" aria-label="Close chat">×</button>
         </div>
-        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-messages" id="chat-messages" role="log" aria-live="polite"><div class="chat-empty" id="chat-empty"><i class="far fa-comment-dots" aria-hidden="true"></i><strong>Say hello</strong><span>Messages from your room will appear here.</span></div></div>
         <div class="chat-input">
-            <input type="text" id="message-input" placeholder="Type a message...">
-            <button id="send-message">
+            <input type="text" id="message-input" maxlength="1000" aria-label="Message" placeholder="Write a message…">
+            <button id="send-message" type="button" aria-label="Send message">
                 <i class="fas fa-paper-plane"></i>
             </button>
         </div>
     </div>
 
-    <div id="chat-fab">
+    <button id="chat-fab" type="button" aria-label="Open room chat" aria-controls="chat-panel" aria-expanded="false">
         <span class="chat-notification hidden"></span>
         <i class="fas fa-comments"></i>
-    </div>
+    </button>
 
     <!-- SOS Button -->
     <button id="sos-btn" class="sos-button" title="Hold for 2 seconds to send emergency alert">
@@ -156,37 +211,39 @@
     </button>
 
     <!-- SOS Modal -->
-    <div id="sos-modal" class="sos-modal hidden">
+    <div id="sos-modal" class="sos-modal hidden" role="dialog" aria-modal="true" aria-labelledby="sos-title">
         <div class="sos-modal-content">
             <div class="sos-modal-header">
-                <h2>🚨 Emergency SOS</h2>
-                <button id="sos-modal-close" class="sos-modal-close">&times;</button>
+                <h2 id="sos-title">Emergency SOS</h2>
+                <button id="sos-modal-close" class="sos-modal-close" aria-label="Close SOS dialog">&times;</button>
             </div>
+            <div id="sos-status" class="sos-status hidden" role="status" aria-live="polite"></div>
             <div class="sos-modal-body">
                 <div class="sos-tabs">
-                    <button class="sos-tab active" data-tab="alerts">
-                        <span class="tab-icon">📢</span>
+                    <button class="sos-tab active" data-tab="alerts" aria-pressed="true">
+                        <i class="fas fa-bullhorn tab-icon" aria-hidden="true"></i>
                         SOS Alerts
                         <span id="sos-count" class="sos-count hidden">0</span>
                     </button>
-                    <button class="sos-tab" data-tab="send">
-                        <span class="tab-icon">🆘</span>
+                    <button class="sos-tab" data-tab="send" aria-pressed="false">
+                        <i class="fas fa-exclamation-triangle tab-icon" aria-hidden="true"></i>
                         Send SOS
                     </button>
                 </div>
                 <div id="sos-tab-alerts" class="sos-tab-content active">
+                    <div class="sos-notifications"><span id="sos-notification-hint">Browser notifications are optional and only work while supported and permitted.</span><button id="sos-notifications-btn" type="button">Enable notifications</button></div>
                     <div id="sos-alerts-list" class="sos-alerts-list">
                         <div class="sos-empty">
                             <span class="sos-empty-icon">✓</span>
                             <p>No active SOS alerts</p>
-                            <small>All users are safe</small>
+                            <small>SOS history is stored on this browser, including alerts from previous rooms.</small>
                         </div>
                     </div>
                 </div>
                 <div id="sos-tab-send" class="sos-tab-content">
                     <div class="sos-send-section">
                         <p class="sos-instruction">Hold the SOS button for 2 seconds to send an emergency alert to all
-                            connected users.</p>
+                            connected room members. This does not contact emergency services. Delivery is not guaranteed; contact emergency services directly when needed.</p>
                         <div class="sos-trigger-area">
                             <button id="sos-trigger-btn" class="sos-trigger-button">
                                 <span class="sos-trigger-text">HOLD TO SEND SOS</span>
@@ -195,20 +252,20 @@
                         </div>
                         <div class="sos-features">
                             <div class="sos-feature">
-                                <span class="feature-icon">📍</span>
-                                <span>Your real-time location</span>
+                                <i class="fas fa-map-marker-alt feature-icon" aria-hidden="true"></i>
+                                <span>Location, if available</span>
                             </div>
                             <div class="sos-feature">
-                                <span class="feature-icon">📱</span>
+                                <i class="fas fa-mobile-alt feature-icon" aria-hidden="true"></i>
                                 <span>Device information</span>
                             </div>
                             <div class="sos-feature">
-                                <span class="feature-icon">🌐</span>
+                                <i class="fas fa-globe feature-icon" aria-hidden="true"></i>
                                 <span>IP address & location</span>
                             </div>
                             <div class="sos-feature">
-                                <span class="feature-icon">🔔</span>
-                                <span>Instant notification</span>
+                                <i class="fas fa-bell feature-icon" aria-hidden="true"></i>
+                                <span>Alert connected room members</span>
                             </div>
                         </div>
                     </div>

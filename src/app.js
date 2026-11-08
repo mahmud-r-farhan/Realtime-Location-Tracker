@@ -27,6 +27,19 @@ const io = socketIo(server, {
     // Cap single-message size (DoS protection). Location/chat/SOS payloads are tiny;
     // WebRTC SDPs are the largest legitimate messages (~10-20 KB).
     maxHttpBufferSize: 1e6,
+    // CORS alone does not protect WebSocket upgrades. Reject browser origins
+    // other than this host unless explicitly allowed by the operator.
+    allowRequest: (req, callback) => {
+        const origin = req.headers.origin;
+        if (!origin) return callback(null, true); // non-browser clients
+        try {
+            const url = new URL(origin);
+            const sameHost = url.host === req.headers.host && ['http:', 'https:'].includes(url.protocol);
+            callback(null, sameHost || allowedOrigins.includes('*') || allowedOrigins.includes(origin));
+        } catch {
+            callback(null, false);
+        }
+    },
     // Mobile devices background tabs frequently; relax heartbeat slightly to
     // avoid false-positive disconnects on flaky mobile networks.
     pingInterval: 25000,

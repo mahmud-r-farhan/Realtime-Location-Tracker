@@ -1,257 +1,58 @@
-# Real-Time Location Tracker Documentation
+# Real-Time Location Tracker
 
-The **Real-Time Location Tracker** is a web application designed to monitor and track the real-time locations of connected devices. It leverages interactive map visualizations (Leaflet), instant communication (WebSockets), and real-time audio communication (WebRTC). The application is suitable for various use cases, including:
+A Node.js and Socket.IO location-sharing application with a Leaflet map, room-scoped chat, WebRTC audio invitations, and an SOS relay. Version 5 is **not yet production-ready**: see [AUDIT.md](AUDIT.md) before deploying or contributing.
 
-- Fleet management
-- Delivery tracking
-- Team coordination
-- Personal location sharing
-- **Emergency response with SOS alerts**
+> **Safety and privacy:** This is not an emergency service. An SOS is only relayed to currently connected members of the selected room; the server acknowledgement does not mean anyone received or acted on it. Call local emergency services directly. Room names are not passwords, and there is no user authentication or authorization: anyone who knows or guesses a room name can join and see its location and other data. Do not use it for sensitive fleet or personal tracking on a public server.
 
-The application provides a responsive design for a consistent user experience across desktops, tablets, and smartphones. It also supports offline map functionality and PWA installation.
+## Run locally
 
----
+Requires Node.js 18 or newer and npm. From the repository root:
 
-[![download-ezgif-com-video-to-gif-converter.gif](https://i.postimg.cc/8P8K6kjc/download-ezgif-com-video-to-gif-converter.gif)](https://postimg.cc/8sHm8Sdg)
-
-## 🚀 Features
-
-### Core Features
-- **Real-Time Tracking:** Track device locations with continuous real-time updates
-- **Smart Device Identification:** Recognizes and categorizes devices based on user agent strings
-- **Device Connection Panel:** View a list of connected devices and their active status
-- **Customizable Icons:** Unique icons for different device types
-- **Offline Map Support:** Intelligent switching between online and offline map modes
-- **Responsive Design:** Optimized for all devices
-- **Interactive Popups:** View details of connected devices
-
-### Communication Features
-- **Audio Communication (WebRTC):** Real-time voice communication among connected devices
-- **Broadcast Call:** "Megaphone" feature to invite all users to a call
-- **Live Chat Messaging:** Send instant text messages using WebSockets
-- **Locate via Chat:** Click any message to instantly find the sender on the map
-- **Activity Logs:** A comprehensive log system that tracks server notifications, connection events, and disconnections
-
-### 🆘 Emergency SOS Feature (NEW in v4.0)
-- **SOS Button:** Hold for 2 seconds to send an emergency alert to ALL connected users
-- **Instant Location Sharing:** Your real-time GPS coordinates are immediately shared
-- **Device Details:** Includes battery level, connection type, and platform info
-- **IP Geolocation:** Shows approximate location based on IP address
-- **Audio Alert:** Alarm sound plays on all receiving devices
-- **SOS Modal:** View and manage all SOS alerts in one place
-- **Browser Notifications:** Push notifications for SOS alerts (when permitted)
-- **Vibration Support:** Mobile devices vibrate when receiving SOS
-
-### 📱 Progressive Web App (PWA)
-- **Installable:** Install the app on your home screen like a native app
-- **Offline Support:** Core functionality works even without internet
-- **Push Notifications:** Receive alerts even when the app is closed
-- **Auto Updates:** Automatically update to the latest version
-
----
-
-## Prerequisites
-
-- Node.js: v18 or higher
-- npm: v8 or higher
-
----
-
-## Folder Structure
-
-```
-realtime-location-tracker/
-├── public/
-│   ├── assets/
-│   │   ├── icons/              # PWA icons
-│   │   ├── android-log.png
-│   │   ├── ios-log.png
-│   │   ├── windows-log.png
-│   │   ├── mac-log.png
-│   │   ├── linux-log.svg       # New Linux support
-│   │   ├── unknown-log.png
-│   │   ├── microphone-*.png
-│   │   ├── speaker-*.png
-│   │   └── favico.png
-│   ├── css/
-│   │   ├── style.css           # Modernized Glassmorphism
-│   │   ├── panel.css
-│   │   ├── device.css
-│   │   ├── chat.css
-│   │   ├── audio.css
-│   │   ├── notification.css
-│   │   ├── popup.css
-│   │   ├── responsive.css
-│   │   ├── icon.css
-│   │   ├── sos.css
-│   ├── js/
-│   │   ├── main.js             # Main app orchestrator
-│   │   ├── config.js           # Configuration constants
-│   │   ├── device.js           # Device detection
-│   │   ├── map.js              # Leaflet map management
-│   │   ├── socket.js           # Socket.IO handlers
-│   │   ├── ui.js               # UI components
-│   │   ├── notification.js     # Notification system
-│   │   ├── chat.js             # Chat functionality
-│   │   ├── audio.js            # WebRTC audio
-│   │   ├── sos.js              # 🆘 SOS emergency module
-│   │   ├── profile.js          # New Profile Management
-│   │   ├── controls.js         # New Map Controls
-│   │   └── pwa.js              # PWA management
-│   ├── manifest.json           # PWA manifest
-│   ├── sw.js                   # Service Worker
-│   └── offline.html            # Offline fallback page
-├── src/                        # New Server-side Source Directory
-│   ├── middleware/             # Security (Helmet, Rate Limit)
-│   ├── routes/
-│   ├── sockets/                # Enhanced validation
-│   ├── views/                  # EJS templates
-│   └── app.js                  # Entry point
-├── package.json
-├── Dockerfile
-└── README.md
-```
-
----
-
-## Installation
-
-1. **Clone the Repository:**
-```bash
-git clone https://github.com/mahmud-r-farhan/realtime-location-tracker.git
-cd realtime-location-tracker
-```
-
-2. **Install Dependencies:**
-```bash
-npm install
-```
-
-3. **Run the Application:**
-```bash
+```sh
+npm ci
 npm start
+# open http://localhost:3007
+npm run check
+npm test
+# Optional browser interaction checks (requires Playwright Chromium)
+npx playwright-core install chromium
+npm run test:browser
 ```
 
-4. **Open in Browser:**
-```
-http://localhost:3007
-```
+For other devices and production, use HTTPS on the same origin (geolocation, microphone access and service workers require a secure context; localhost is a browser exception). Reverse proxies must forward WebSocket upgrades and use a long enough timeout. The app has no HTTPS listener itself. `GET /health` reports process health, not external dependency or end-to-end feature health.
 
----
+### Configuration
 
-## Usage
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3007` | HTTP listen port |
+| `NODE_ENV` | `development` | In production the session cookie has the Secure flag and requires HTTPS |
+| `SESSION_SECRET` | random per process | Stable secret for signed anonymous session cookies; set a long random value across restarts |
+| `TRUST_PROXY` | unset | Set to `1` only behind exactly one trusted proxy that overwrites forwarded headers; keep the app inaccessible directly |
+| `ALLOWED_ORIGINS` | unset | Comma-separated extra browser origins permitted to connect to Socket.IO. Same host is always permitted. Avoid `*`. |
 
-1. Open `http://localhost:3007` in a web browser
-2. Grant location access when prompted
-3. View the real-time locations of connected devices on the map
-4. Click on device markers to view detailed information
+The anonymous signed cookie prevents forged cookie values but **does not authenticate a person**, expire server-side, or restrict access to rooms. Data is held in process memory; use one instance only. Proxy IPs can be inaccurate and must not be treated as identity or location.
 
-### Using SOS Emergency Feature
+### Docker
 
-1. **Quick Access:** Look for the red **SOS button** in the top-right corner
-2. **Sending SOS:** 
-   - Hold the SOS button for **2 seconds** to send an emergency alert
-   - The button will show a progress indicator while holding
-   - Upon release after 2 seconds, an SOS is sent to ALL connected users
-3. **SOS Information Shared:**
-   - Your real-time GPS location (latitude, longitude, accuracy)
-   - Device information (platform, battery level, connection type)
-   - IP address and approximate location
-   - Timestamp
-4. **Receiving SOS:**
-   - An alarm sound will play
-   - Mobile devices will vibrate
-   - A modal will open showing the SOS details
-   - You can click "View on Map" to see the sender's location
-5. **Managing SOS Alerts:**
-   - Click the SOS button (short press) to open the SOS modal
-   - View all recent SOS alerts in the "SOS Alerts" tab
-   - Dismiss alerts once addressed
-
-### Installing as PWA
-
-1. **Chrome/Firefox (Desktop):** Click the install icon in the address bar
-2. **Chrome (Android):** Tap "Add to Home Screen" from the menu
-3. **Safari (iOS):** Tap Share → "Add to Home Screen"
-
----
-
-## API Events
-
-### Socket.IO Events
-
-| Event | Direction | Description |
-|-------|-----------|-------------|
-| `join-room` | Client → Server | Join a specific Organization/Fleet |
-| `send-location` | Client → Server | Send device location |
-| `receive-location` | Server → Client | Receive location updates (Room Scoped) |
-| `sos-alert` | Bidirectional | Emergency SOS broadcast (Room Scoped) |
-| `request-join-call` | Client → Server | Broadcast invitation to join call |
-| `chat-message` | Bidirectional | Chat messages (Room Scoped) |
-| `join-audio` | Client → Server | Join audio channel (Room Scoped) |
-| `user-connected` | Server → Client | New user notification |
-| `user-disconnect` | Server → Client | User left notification |
-
----
-
-## Live Demo
-
-- Live: [Render Deployment](https://realtime-location-tracker-v9ow.onrender.com/)
-- Invite multiple users to test tracking, chat, and SOS features!
-
----
-
-## Deployment Options
-
-### Docker Deployment
-
-```bash
-# Build the image
-docker build -t realtime-location-tracker .
-
-# Run the container
-docker run -p 3007:3007 --name tracker -d realtime-location-tracker
-
-# Access at http://localhost:3007
+```sh
+docker compose up --build
 ```
 
-### Docker Compose
+Compose runs in production mode and exposes port 3007 over HTTP. Put a TLS-terminating proxy in front of it and configure `SESSION_SECRET` and (only when appropriate) `TRUST_PROXY`. Without HTTPS the Secure cookie will not work in ordinary remote browsers. Docker's health check only tests `/health`.
 
-```bash
-docker-compose up -d
-```
+## Features and limitations
 
-## Contact
+- Enter a name and room (default `public`); share the room name or invite URL to join. Map updates use browser geolocation and require permission. Use **Pause sharing** in Devices to stop publishing and remove this device’s location from the room; the preference persists in this browser until resumed. A disconnected device may remain visible until the server detects the disconnect, and pausing cannot erase data already seen or saved by others. SOS can still request and share your location while paused.
+- The first local location fix centers the map unless you have already interacted with it. Zoom, map styles and **Show all on map** help explore current room markers; live marker updates do not pull an open popup back into view. If an entire tile batch fails, the map shows a retry option; availability depends on the selected third-party provider. Fix age is based on the reporting device’s clock, and the accuracy radius is an estimate, not a guarantee. Stationary devices refresh approximately once a minute while the page is active; background throttling, permission failures and network interruptions can make fixes stale. A device count represents devices with location fixes, not everyone connected. Device classification (including iPadOS and ChromeOS) and battery information are best-effort browser hints and can be missing or wrong. Pins distinguish your device from other devices; activate a pin for details.
+- Chat reaches connected room members only; messages are not persisted by the server. Click a message to focus its sender's current marker, if available. The local chat view and draft are cleared when switching rooms. Acknowledgements confirm relay only.
+- Audio is peer-to-peer and requires microphone permission. The default configuration has public STUN servers but **no TURN relay**. Calls can fail behind restrictive NAT/firewalls, and the mesh design does not scale to large rooms. Audio is stopped on disconnect or a room change and must be joined again.
+- Hold SOS to relay an alert to connected room members. A visible status distinguishes an unsent alert, an unconfirmed acknowledgement and relay to the server; relay is not proof of receipt or response. An alert started in one room is not intentionally sent after a room change or reconnect. Location attempts are time-bounded and fallback fixes are labelled as potentially old. GPS may be unavailable or old; an alert can be sent without it. Browser notifications are optional and requested from the SOS dialog; notifications and sound depend on browser permissions, support and autoplay rules. Offline alerts are not delivered or queued. There is no server push subscription or delivery to closed applications. SOS IP enrichment sends the observed IP to ipapi.co; IP geolocation is approximate, not a GPS fallback. Be aware that device/IP details are shared with room participants.
+- The service worker caches assets and some previously viewed tiles; if the server cannot be reached on navigation, it shows an offline notice instead of a live tracker. Offline availability is best effort and dependent on browser caches and tile providers. Real-time tracking, messaging, audio and SOS require a connection. Respect tile provider terms and do not rely on this as an offline navigation product.
+- Profile and some alerts/settings are stored locally in the browser; the local SOS history is shared across room changes and is not a room-isolated audit log. Server state is volatile and lost on restart. Activity notifications are local, bounded UI messages, can be cleared, and reset on room changes; they are not an audit log.
 
-- **Email:** [farhanstack.dev@gmail.com](mailto:farhanstack.dev@gmail.com)
-- **GitHub:** [mahmud-r-farhan](https://github.com/mahmud-r-farhan)
+## Development and community
 
----
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [Changelog](Changelog), and [AUDIT.md](AUDIT.md). The automated suites exercise HTTP and Socket.IO server behavior plus Chromium workspace interactions at several viewport sizes. Browser tests use simulated geolocation, mock or block third-party tiles and disable service workers; they do not validate real mobile GPS, microphone hardware, restrictive networks, service workers, or end-to-end emergency delivery. Verify those separately on real devices before considering a release.
 
-## FAQ
-
-**Q: How accurate is the GPS?**
-A: Depends on device hardware (typically ±5-50 meters).
-
-**Q: Can I use custom map providers?**
-A: Yes! Use the new Layer Control to switch between default maps, or edit `map.js` to add more.
-
-**Q: Is the SOS feature secure?**
-A: SOS alerts are broadcast to all connected users only. Data is sanitized server-side.
-
-**Q: Does the app work offline?**
-A: Yes! The PWA caches assets and shows an offline page when connectivity is lost.
-
----
-
-## Troubleshooting
-
-- **Location Not Updating:** Ensure geolocation is enabled and the browser has permission
-- **WebSocket Errors:** Verify port 3007 is open and not blocked by a firewall
-- **SOS Not Working:** Check browser notification permissions and microphone access
-- **PWA Not Installing:** Ensure you're accessing via HTTPS or localhost
-- **WebRTC Issues:** Check STUN/TURN server configurations and network connectivity
-
----
-
-Star this project if you find it helpful! ⭐
+Licensed under the terms in [LICENSE](LICENSE).

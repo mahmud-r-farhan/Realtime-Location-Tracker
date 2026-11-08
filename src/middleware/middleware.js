@@ -5,7 +5,7 @@ const helmet = require('helmet');
 const path = require('path');
 
 module.exports = function setupMiddleware(app) {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.TRUST_PROXY === '1') {
         app.set('trust proxy', 1);
     }
 

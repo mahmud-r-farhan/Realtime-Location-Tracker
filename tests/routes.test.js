@@ -37,6 +37,12 @@ describe('HTTP Routes API', () => {
         assert.ok(!second.headers['set-cookie'], 'no new session should be issued');
     });
 
+    it('serves the onboarding illustration', async () => {
+        const response = await request(app).get('/assets/workspace-location.jpg');
+        assert.equal(response.status, 200);
+        assert.match(response.headers['content-type'], /image\/jpeg/);
+    });
+
     it('GET /developer - should redirect', async () => {
         const response = await request(app).get('/developer');
         assert.strictEqual(response.status, 302);

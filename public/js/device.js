@@ -1,24 +1,20 @@
+// Browser identification is best-effort: browsers may reduce or spoof these hints.
+export function detectDevice(userAgent = '', platform = '', touchPoints = 0) {
+    const ua = String(userAgent);
+    const plat = String(platform);
+    if (/android/i.test(ua)) return { name: 'Android Device', type: 'Android', os: 'Android' };
+    if (/iPad|iPhone|iPod/i.test(ua) || (/Macintosh|MacIntel/i.test(`${ua} ${plat}`) && touchPoints > 1)) {
+        return { name: 'iOS Device', type: 'iOS', os: 'iOS / iPadOS' };
+    }
+    if (/CrOS/i.test(ua)) return { name: 'Chromebook', type: 'ChromeOS', os: 'ChromeOS' };
+    if (/Windows/i.test(ua) || /^Win/i.test(plat)) return { name: 'Windows PC', type: 'Windows', os: 'Windows' };
+    if (/Macintosh|Mac OS/i.test(ua) || /^Mac/i.test(plat)) return { name: 'Mac', type: 'Mac', os: 'macOS' };
+    if (/Linux/i.test(`${ua} ${plat}`)) return { name: 'Linux PC', type: 'Linux', os: 'Linux' };
+    return { name: 'Unknown Device', type: 'Unknown', os: 'Unknown' };
+}
+
 export function getDeviceName() {
-    const userAgent = navigator.userAgent;
-
-    if (/android/i.test(userAgent)) return 'Android Device';
-    // iPadOS 13+ masquerades as macOS; requestDesktopSite variants still
-    // report multi-touch, which desktop Macs never do.
-    const isIOS = /iPad|iPhone|iPod/.test(userAgent) ||
-        (/Macintosh/.test(userAgent) && navigator.maxTouchPoints > 1);
-    if (isIOS) return 'iOS Device';
-
-    const platform = navigator.platform ? navigator.platform.toLowerCase() : '';
-    if (/win/i.test(platform)) return 'Windows PC';
-    if (/mac/i.test(platform)) return 'Mac';
-    if (/linux/i.test(platform) && !/android/i.test(userAgent)) return 'Linux PC';
-
-    // Fallback to User Agent if platform is not specific enough
-    if (/Windows NT/i.test(userAgent)) return 'Windows PC';
-    if (/Macintosh/i.test(userAgent)) return 'Mac';
-    if (/Linux/i.test(userAgent)) return 'Linux PC';
-
-    return 'Unknown Device';
+    return detectDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints).name;
 }
 
 // Device info changes rarely (and costs several API reads to build), so it is
@@ -34,20 +30,14 @@ export async function getDeviceInfo(forceRefresh = false) {
     }
 
     const userAgent = navigator.userAgent;
-    let deviceType = 'Desktop';
-
-    if (/android/i.test(userAgent)) deviceType = 'Android';
-    else if (/iPad|iPhone|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && navigator.maxTouchPoints > 1)) deviceType = 'iOS';
-    else if (/Windows NT/i.test(userAgent)) deviceType = 'Windows';
-    else if (/Macintosh/i.test(userAgent)) deviceType = 'Mac';
-    else if (/Linux/i.test(userAgent)) deviceType = 'Linux';
+    const device = detectDevice(userAgent, navigator.platform, navigator.maxTouchPoints);
 
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const connectionType = conn ? (conn.effectiveType || conn.type || 'unknown') : 'unknown';
 
     const info = {
-        deviceType: deviceType,
-        os: navigator.platform || 'Unknown',
+        deviceType: device.type,
+        os: device.os,
         browser: getBrowserName(userAgent),
         screen: `${window.screen.width}x${window.screen.height}`,
         connection: connectionType,
@@ -73,22 +63,46 @@ export async function getDeviceInfo(forceRefresh = false) {
     return info;
 }
 
-function getBrowserName(userAgent) {
-    if (userAgent.includes("Firefox")) return "Firefox";
-    if (userAgent.includes("SamsungBrowser")) return "Samsung Internet";
-    if (userAgent.includes("Opera") || userAgent.includes("OPR")) return "Opera";
-    if (userAgent.includes("Edg")) return "Edge";
-    if (userAgent.includes("Chrome")) return "Chrome";
-    if (userAgent.includes("Safari")) return "Safari";
-    return "Unknown";
+// Supplemental device metadata must never block a location or emergency alert.
+export async function getDeviceInfoSafely(timeoutMs = 2000) {
+    let timer;
+    try {
+        return await Promise.race([
+            getDeviceInfo().catch(() => ({})),
+            new Promise(resolve => { timer = setTimeout(() => resolve({}), timeoutMs); })
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+export function getBrowserName(userAgent = '') {
+    if (/EdgA|EdgiOS|Edg\//i.test(userAgent)) return 'Edge';
+    if (/SamsungBrowser/i.test(userAgent)) return 'Samsung Internet';
+    if (/OPR\/|Opera|OPiOS/i.test(userAgent)) return 'Opera';
+    if (/FxiOS|Firefox/i.test(userAgent)) return 'Firefox';
+    if (/CriOS|Chrome|Chromium/i.test(userAgent)) return 'Chrome';
+    if (/Safari/i.test(userAgent)) return 'Safari';
+    return 'Unknown';
 }
 
 export function getDeviceIcon(deviceName) {
     const name = typeof deviceName === 'string' ? deviceName : '';
-    if (name.includes('Android')) return 'Android Device';
-    if (name.includes('iOS')) return 'iOS Device';
-    if (name.includes('Windows')) return 'Windows PC';
-    if (name.includes('Linux')) return 'Linux PC';
-    if (name.includes('Mac')) return 'Mac';
+    if (/android/i.test(name)) return 'Android Device';
+    if (/ios|ipad|iphone|ipod/i.test(name)) return 'iOS Device';
+    if (/chromeos|chromebook|cros/i.test(name)) return 'Chromebook';
+    if (/windows/i.test(name)) return 'Windows PC';
+    if (/linux/i.test(name)) return 'Linux PC';
+    if (/mac/i.test(name)) return 'Mac';
     return 'Unknown Device';
+}
+
+// Keep the drawer's device symbols consistent with the map pins.
+export function getDeviceSymbol(iconKey) {
+    const symbols = {
+        'Android Device': 'fa-mobile-alt', 'iOS Device': 'fa-mobile-alt',
+        'Windows PC': 'fa-desktop', 'Mac': 'fa-laptop', 'Linux PC': 'fa-desktop',
+        'Chromebook': 'fa-laptop', 'Unknown Device': 'fa-map-marker-alt'
+    };
+    return symbols[iconKey] || symbols['Unknown Device'];
 }

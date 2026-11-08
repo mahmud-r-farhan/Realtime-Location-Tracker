@@ -1,13 +1,18 @@
-import { socket } from './socket.js';
-import { getDeviceInfo, getDeviceName } from './device.js';
+import { socket, getJoinedRoom } from './socket.js';
+import { getDeviceInfoSafely, getDeviceName } from './device.js';
 import { getUserName } from './profile.js';
 import { addNotification } from './notification.js';
-import { markers } from './map.js';
+import { markers, showSOSLocation } from './map.js';
 import { escapeHtml, isValidLatLng } from './utils.js';
 
 // SOS State
 let sosHoldTimer = null;
+let cancelModalHold = null;
+let sosReturnFocus = null;
 let isSOSActive = false;
+let sosContextVersion = 0;
+window.addEventListener('tracker-room-changing', () => { sosContextVersion++; });
+socket.on('disconnect', () => { sosContextVersion++; });
 let sosAlerts = [];
 const SOS_HOLD_DURATION = 2000; // 2 seconds hold to trigger SOS
 const SOS_TAP_DURATION = 400;   // shorter than this = tap (opens the alerts modal)
@@ -23,12 +28,39 @@ let audioContext = null;
 export function initSOS() {
     setupSOSButton();
     setupSOSModal();
+    setupSOSNotifications();
     initSOSSocketHandlers();
     loadSOSFromStorage();
     setupSOSListActions();
     console.log('[SOS] SOS module initialized');
 }
 
+
+function setupSOSNotifications() {
+    const button = document.getElementById('sos-notifications-btn');
+    const hint = document.getElementById('sos-notification-hint');
+    if (!button || !hint) return;
+    function update() {
+        if (!('Notification' in window)) {
+            hint.textContent = 'Browser notifications are not supported here.';
+            button.hidden = true;
+        } else if (Notification.permission === 'granted') {
+            hint.textContent = 'Browser notifications are enabled when supported. They do not guarantee delivery.';
+            button.hidden = true;
+        } else if (Notification.permission === 'denied') {
+            hint.textContent = 'Notifications are blocked. Change browser permissions to enable them.';
+            button.hidden = true;
+        } else {
+            hint.textContent = 'Optional browser notifications do not guarantee delivery.';
+            button.hidden = false;
+        }
+    }
+    button.addEventListener('click', async () => {
+        try { await Notification.requestPermission(); } catch (error) { console.warn('[SOS] Notification permission failed:', error); }
+        update();
+    });
+    update();
+}
 
 function setupSOSButton() {
     const sosButton = document.getElementById('sos-btn');
@@ -76,8 +108,8 @@ function setupSOSButton() {
     console.log('[SOS] SOS button setup complete');
 }
 
-function startSOSHold() {
-    if (sosHoldTimer) return;
+function startSOSHold(event) {
+    if (isSOSActive || sosHoldTimer || (event && event.button !== undefined && event.button !== 0)) return;
 
     const sosButton = document.getElementById('sos-btn');
     if (sosButton) {
@@ -120,122 +152,120 @@ async function resolveSOSLocation() {
         { enableHighAccuracy: false, timeout: 4000, maximumAge: 5 * 60 * 1000 }
     ];
 
-    for (const options of attempts) {
-        if (!('geolocation' in navigator)) break;
+    for (const [index, options] of attempts.entries()) {
+        if (!navigator.geolocation) break;
+        let timer;
         try {
+            // Some implementations never invoke either callback despite their
+            // timeout option. Bound each attempt independently of the browser.
             const position = await new Promise((resolve, reject) => {
+                timer = setTimeout(() => reject(new Error('Location timed out')), options.timeout + 250);
                 navigator.geolocation.getCurrentPosition(resolve, reject, options);
             });
             if (isValidLatLng(position.coords.latitude, position.coords.longitude)) {
+                const accuracy = position.coords.accuracy == null ? null : Number(position.coords.accuracy);
                 return {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: Number(position.coords.accuracy) || 0,
-                    locationAvailable: true
+                    latitude: position.coords.latitude, longitude: position.coords.longitude,
+                    accuracy: Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : null,
+                    locationAvailable: true, locationSource: index === 0 ? 'fresh' : 'cached'
                 };
             }
         } catch (error) {
-            console.warn('[SOS] Location attempt failed:', error && error.message ? error.message : error);
-        }
+            console.warn('[SOS] Location attempt failed:', error?.message || error);
+        } finally { clearTimeout(timer); }
     }
 
-    // Fall back to the last position we shared on the map (our own marker)
-    try {
-        const selfMarker = markers[socket.id];
-        if (selfMarker && typeof selfMarker.getLatLng === 'function') {
-            const ll = selfMarker.getLatLng();
-            if (isValidLatLng(ll.lat, ll.lng)) {
-                return { latitude: ll.lat, longitude: ll.lng, accuracy: 0, locationAvailable: true };
-            }
-        }
-    } catch (error) {
-        console.warn('[SOS] Could not read last known position:', error);
+    const marker = markers[socket.id];
+    const ll = marker?.getLatLng();
+    if (ll && isValidLatLng(ll.lat, ll.lng)) {
+        const accuracy = marker._trackerFix?.accuracy;
+        return { latitude: ll.lat, longitude: ll.lng, accuracy: Number.isFinite(accuracy) ? accuracy : null,
+            locationAvailable: true, locationSource: 'last-shared' };
     }
-
-    // No usable position - still send the alert so people know there is an emergency
-    return { latitude: 0, longitude: 0, accuracy: 0, locationAvailable: false };
+    return { latitude: 0, longitude: 0, accuracy: null, locationAvailable: false, locationSource: 'unknown' };
 }
 
+function setSOSStatus(message, state = '') {
+    const status = document.getElementById('sos-status');
+    if (!status) return;
+    status.textContent = message;
+    status.dataset.state = state;
+    status.classList.toggle('hidden', !message);
+}
 
 async function triggerSOS() {
+    if (isSOSActive) return;
     isSOSActive = true;
     sosHoldTimer = null;
-
+    const room = getJoinedRoom();
+    const connectionId = socket.id;
+    const sender = getUserName() || getDeviceName();
+    const contextVersion = sosContextVersion;
     const sosButton = document.getElementById('sos-btn');
-    if (sosButton) {
-        sosButton.classList.remove('holding');
-        sosButton.classList.add('triggered');
-    }
-
-    // Vibrate pattern (mobile)
-    if (navigator.vibrate) {
-        navigator.vibrate([200, 100, 200, 100, 200]);
-    }
-
-    // Reset the button state after 5 seconds no matter what happens below
-    const resetTimeout = setTimeout(() => {
-        isSOSActive = false;
-        if (sosButton) sosButton.classList.remove('triggered');
-    }, 5000);
+    const triggerButton = document.getElementById('sos-trigger-btn');
+    sosButton?.classList.remove('holding');
+    sosButton?.classList.add('triggered');
+    if (triggerButton) triggerButton.disabled = true;
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+    openSOSModal('send');
+    setSOSStatus('Preparing alert and checking location. This does not contact emergency services.', 'pending');
 
     try {
-        const [location, deviceInfo] = await Promise.all([
-            resolveSOSLocation(),
-            getDeviceInfo().catch(() => ({}))
-        ]);
-
-        const sosData = {
-            sender: getUserName() || getDeviceName(),
-            location: {
-                latitude: location.latitude,
-                longitude: location.longitude,
-                accuracy: location.accuracy
-            },
+        if (!socket.connected || !room) {
+            addSOSToList({ sender, room: room || 'Unknown', timestamp: Date.now(),
+                location: { latitude: 0, longitude: 0, accuracy: null }, locationAvailable: false,
+                isOwn: true, delivery: 'not-sent', ipInfo: { ip: 'Unknown' } });
+            setSOSStatus('SOS not sent: not connected to a room. Contact emergency services directly.', 'error');
+            addNotification('⚠️ SOS not sent: not connected to a room.');
+            if (!document.getElementById('sos-modal')?.classList.contains('hidden')) switchSOSTab('alerts');
+            return;
+        }
+        const [location, deviceInfo] = await Promise.all([resolveSOSLocation(), getDeviceInfoSafely()]);
+        const entry = {
+            sender,
+            location: { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy },
             locationAvailable: location.locationAvailable,
-            // The server whitelists deviceInfo keys; keep the payload lean
-            deviceInfo: deviceInfo || {},
-            // Our public IP is only known to the server - filled in via the emit ack
-            ipInfo: { ip: IP_PENDING },
-            timestamp: Date.now(),
-            message: 'Emergency SOS Alert!'
+            locationSource: location.locationSource,
+            deviceInfo: deviceInfo || {}, ipInfo: { ip: IP_PENDING }, timestamp: Date.now(),
+            message: 'Emergency SOS Alert!', isOwn: true, room: room || 'Unknown', delivery: 'pending'
         };
+        // Insert immediately; IP lookup must never delay the alert or its display.
+        addSOSToList(entry);
+        if (!document.getElementById('sos-modal')?.classList.contains('hidden')) switchSOSTab('alerts');
 
-        const localEntry = { ...sosData, isOwn: true };
-
-        // Emit SOS to all users in the room. The ack carries our public IP so
-        // our own alert card can show real data instead of a placeholder.
-        socket.emit('sos-alert', sosData, (response) => {
-            if (response && response.success && response.ip) {
-                localEntry.ipInfo = { ip: String(response.ip) };
-                persistAndRender();
-                enrichIpInfo(localEntry);
-            } else if (response && response.error) {
-                localEntry.ipInfo = { ip: 'Unknown' };
-                persistAndRender();
-                addNotification(`⚠️ SOS not delivered: ${response.error}`);
+        if (!socket.connected || !room || socket.id !== connectionId || getJoinedRoom() !== room || sosContextVersion !== contextVersion) {
+            entry.delivery = 'not-sent';
+            entry.ipInfo = { ip: 'Unknown' };
+            setSOSStatus('SOS not sent: connection or room changed. Contact emergency services directly.', 'error');
+            addNotification('⚠️ SOS not sent: connection or room changed.');
+        } else {
+            const result = await new Promise(resolve => {
+                socket.timeout(5000).emit('sos-alert', { ...entry, expectedRoom: room, expectedSocketId: connectionId }, (error, response) => resolve({ error, response }));
+            });
+            if (!result.error && result.response?.success) {
+                entry.delivery = 'relayed';
+                entry.ipInfo = { ip: String(result.response.ip || 'Unknown') };
+                setSOSStatus('Relayed to the room. Receipt and response are not guaranteed.', 'relayed');
+                addNotification('⚠️ SOS relayed to connected room members. Receipt is not guaranteed.');
+                enrichIpInfo(entry);
+            } else {
+                entry.delivery = result.response?.error ? 'not-sent' : 'unconfirmed';
+                entry.ipInfo = { ip: 'Unknown' };
+                setSOSStatus(result.response?.error ? `SOS not sent: ${result.response.error} Contact emergency services directly.` : 'SOS delivery not confirmed. Contact emergency services directly.', 'error');
+                addNotification(`⚠️ SOS ${result.response?.error ? 'not sent' : 'delivery not confirmed'}. Contact emergency services directly.`);
             }
-        });
-
-        // Add to local notifications
-        addNotification(location.locationAvailable
-            ? '⚠️ SOS sent! All users have been alerted.'
-            : '⚠️ SOS sent (without GPS location). All users have been alerted.');
-
-        // Add to local SOS list
-        await addSOSToList(localEntry);
-
-        // Open modal to show confirmation
-        openSOSModal('alerts');
-
+        }
+        persistAndRender();
     } catch (error) {
         console.error('[SOS] Error triggering SOS:', error);
-        addNotification('❌ SOS failed - unexpected error');
-        clearTimeout(resetTimeout);
+        setSOSStatus('SOS failed. Contact emergency services directly.', 'error');
+        addNotification('❌ SOS failed. Contact emergency services directly.');
+    } finally {
         isSOSActive = false;
-        if (sosButton) sosButton.classList.remove('triggered');
+        sosButton?.classList.remove('triggered');
+        if (triggerButton) triggerButton.disabled = false;
     }
 }
-
 
 function setupSOSModal() {
     const modal = document.getElementById('sos-modal');
@@ -268,13 +298,12 @@ function setupSOSModal() {
     if (triggerBtn) {
         let modalHoldTimer = null;
 
-        const startModalHold = () => {
-            if (modalHoldTimer) return;
+        const startModalHold = (event) => {
+            if (isSOSActive || modalHoldTimer || (event && event.button !== undefined && event.button !== 0)) return;
             triggerBtn.classList.add('holding');
             modalHoldTimer = setTimeout(() => {
                 modalHoldTimer = null;
                 triggerBtn.classList.remove('holding');
-                closeSOSModal();
                 triggerSOS();
             }, SOS_HOLD_DURATION);
 
@@ -283,7 +312,7 @@ function setupSOSModal() {
             }
         };
 
-        const cancelModalHold = () => {
+        cancelModalHold = () => {
             if (modalHoldTimer) {
                 clearTimeout(modalHoldTimer);
                 modalHoldTimer = null;
@@ -300,6 +329,16 @@ function setupSOSModal() {
         }, { passive: false });
         triggerBtn.addEventListener('touchend', cancelModalHold);
         triggerBtn.addEventListener('touchcancel', cancelModalHold);
+        triggerBtn.addEventListener('keydown', event => {
+            if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+                event.preventDefault();
+                startModalHold();
+            }
+        });
+        triggerBtn.addEventListener('keyup', event => {
+            if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); cancelModalHold(); }
+        });
+        triggerBtn.addEventListener('blur', cancelModalHold);
     }
 
     // Escape key to close
@@ -314,13 +353,15 @@ function setupSOSModal() {
 
 
 function switchSOSTab(tabName) {
-    document.querySelectorAll('.sos-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.sos-tab').forEach(t => {
+        const active = t.dataset.tab === tabName;
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-pressed', String(active));
+    });
     document.querySelectorAll('.sos-tab-content').forEach(c => c.classList.remove('active'));
 
-    const tab = document.querySelector(`.sos-tab[data-tab="${tabName}"]`);
     const content = document.getElementById(`sos-tab-${tabName}`);
 
-    if (tab) tab.classList.add('active');
     if (content) content.classList.add('active');
 }
 
@@ -328,8 +369,10 @@ function switchSOSTab(tabName) {
 function openSOSModal(mode = 'alerts') {
     const modal = document.getElementById('sos-modal');
     if (modal) {
+        if (modal.classList.contains('hidden')) sosReturnFocus = document.activeElement;
         modal.classList.remove('hidden');
         switchSOSTab(mode);
+        document.getElementById('sos-modal-close')?.focus();
         renderSOSAlerts();
     }
 }
@@ -337,7 +380,10 @@ function openSOSModal(mode = 'alerts') {
 function closeSOSModal() {
     const modal = document.getElementById('sos-modal');
     if (modal) {
+        cancelModalHold?.();
         modal.classList.add('hidden');
+        if (sosReturnFocus && typeof sosReturnFocus.focus === 'function') sosReturnFocus.focus();
+        sosReturnFocus = null;
     }
 }
 
@@ -378,33 +424,15 @@ function persistAndRender() {
     updateSOSCount();
 }
 
-async function addSOSToList(sosData) {
+function addSOSToList(sosData) {
     if (!sosData || typeof sosData !== 'object') return;
-
-    // Ensure ipInfo exists
-    if (!sosData.ipInfo || typeof sosData.ipInfo !== 'object') {
-        sosData.ipInfo = { ip: 'Unknown' };
-    }
-    if (!Number.isFinite(Number(sosData.timestamp))) {
-        sosData.timestamp = Date.now();
-    }
+    if (!sosData.ipInfo || typeof sosData.ipInfo !== 'object') sosData.ipInfo = { ip: 'Unknown' };
+    if (!Number.isFinite(Number(sosData.timestamp))) sosData.timestamp = Date.now();
     sosData.isOwn = Boolean(sosData.isOwn);
-
-    // Fetch IP geolocation for remote alerts that carry a real IP.
-    // Own/pending/unknown placeholders are skipped (ack fills ours in later).
-    const ip = sosData.ipInfo.ip;
-    if (!sosData.ipInfo.city && typeof ip === 'string' && ip && !IP_LOOKUP_SKIP.has(ip)) {
-        try {
-            const geoData = await fetchIPGeolocation(ip);
-            sosData.ipInfo = { ...sosData.ipInfo, ...geoData };
-        } catch (error) {
-            console.log('[SOS] Could not fetch IP geolocation:', error);
-        }
-    }
-
     sosAlerts.unshift(sosData);
     if (sosAlerts.length > MAX_SOS_ALERTS) sosAlerts.pop();
     persistAndRender();
+    if (!sosData.isOwn && !sosData.ipInfo.city) enrichIpInfo(sosData);
 }
 
 /** Enrich our own alert with IP geolocation once the server ack provided the IP. */
@@ -418,12 +446,14 @@ async function enrichIpInfo(entry) {
     } catch (error) {
         console.log('[SOS] Could not fetch IP geolocation:', error);
     }
-    persistAndRender();
+    if (sosAlerts.includes(entry)) persistAndRender();
 }
 
 async function fetchIPGeolocation(ip) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
     try {
-        const response = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`);
+        const response = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`, { signal: controller.signal });
         if (!response.ok) throw new Error('IP geolocation fetch failed');
         const data = await response.json();
         return {
@@ -434,6 +464,8 @@ async function fetchIPGeolocation(ip) {
     } catch (error) {
         console.log('[SOS] IP geolocation error:', error);
         return {};
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
@@ -446,7 +478,7 @@ function renderSOSAlerts() {
             <div class="sos-empty">
                 <span class="sos-empty-icon">✓</span>
                 <p>No active SOS alerts</p>
-                <small>All users are safe</small>
+                <small>SOS history is stored on this browser, including alerts from previous rooms.</small>
             </div>
         `;
         return;
@@ -456,7 +488,7 @@ function renderSOSAlerts() {
     list.innerHTML = sosAlerts.map((sos, index) => {
         const lat = sos?.location && Number(sos.location.latitude);
         const lng = sos?.location && Number(sos.location.longitude);
-        const accuracy = Number(sos?.location?.accuracy) || 0;
+        const accuracy = sos?.location?.accuracy == null ? null : Number(sos.location.accuracy);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return ''; // Skip malformed entries
 
         const locationAvailable = sos.locationAvailable !== false;
@@ -465,6 +497,10 @@ function renderSOSAlerts() {
         const safePlatform = escapeHtml(sos.deviceInfo?.deviceType || sos.deviceInfo?.os || 'Unknown');
         const hasIpLocation = sos.ipInfo?.city && sos.ipInfo?.country;
         const hasBattery = sos.deviceInfo?.battery && Number.isFinite(sos.deviceInfo.battery.level);
+        const deliveryLabels = { pending: 'Sending…', relayed: 'Relayed to room · receipt not guaranteed', 'not-sent': 'Not sent', unconfirmed: 'Delivery not confirmed' };
+        const delivery = sos.isOwn && deliveryLabels[sos.delivery];
+        const sourceLabels = { fresh: 'Fresh location request', cached: 'Cached location may be older', 'last-shared': 'Last shared location may be old' };
+        const source = sourceLabels[sos.locationSource];
 
         return `
         <div class="sos-alert-item ${sos.isOwn ? 'own' : ''}" data-index="${index}">
@@ -474,6 +510,8 @@ function renderSOSAlerts() {
                 </span>
                 <span class="sos-alert-time">${formatTime(sos.timestamp)}</span>
             </div>
+            ${delivery ? `<p class="sos-delivery" data-state="${escapeHtml(sos.delivery)}">${escapeHtml(delivery)}</p>` : ''}
+            <p class="sos-history-room">Room: ${escapeHtml(sos.room || 'Unknown (older alert)')} · Stored on this browser</p>
             <div class="sos-alert-details">
                 <div class="sos-detail">
                     <span class="detail-label">📍 Location:</span>
@@ -482,8 +520,9 @@ function renderSOSAlerts() {
                 ${locationAvailable ? `
                 <div class="sos-detail">
                     <span class="detail-label">🎯 Accuracy:</span>
-                    <span class="detail-value">${accuracy.toFixed(0)}m</span>
+                    <span class="detail-value">${Number.isFinite(accuracy) ? `Estimated ±${accuracy.toFixed(0)} m` : 'Unavailable'}</span>
                 </div>
+                ${source ? `<div class="sos-detail"><span class="detail-label">Fix:</span><span class="detail-value">${escapeHtml(source)}</span></div>` : ''}
                 ` : ''}
                 <div class="sos-detail">
                     <span class="detail-label">🌐 IP Address:</span>
@@ -549,8 +588,9 @@ function setupSOSListActions() {
 function viewSOSOnMap(index) {
     const sos = sosAlerts[index];
     if (!sos || sos.locationAvailable === false) return;
-    if (isValidLatLng(sos.location?.latitude, sos.location?.longitude) && window.focusMapOnLocation) {
-        window.focusMapOnLocation(sos.location.latitude, sos.location.longitude);
+    if (isValidLatLng(sos.location?.latitude, sos.location?.longitude)) {
+        showSOSLocation(sos);
+        window.dispatchEvent(new Event('tracker-show-map'));
         closeSOSModal();
     }
 }
@@ -607,7 +647,7 @@ function playSOSSound() {
 function initSOSSocketHandlers() {
     socket.on('sos-alert', async (data) => {
         console.log('[SOS] Received SOS alert:', data);
-        if (!data || typeof data !== 'object') return;
+        if (!data || typeof data !== 'object' || data.room !== getJoinedRoom()) return;
 
         // Play sound
         playSOSSound();
@@ -670,11 +710,6 @@ async function showBrowserNotification(sosData) {
         } catch (e) {
             console.warn('[SOS] Could not show browser notification:', e);
         }
-    } else if (Notification.permission !== 'denied') {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            showBrowserNotification(sosData);
-        }
     }
 }
 
@@ -704,7 +739,7 @@ function loadSOSFromStorage() {
             sos.location &&
             isValidLatLng(Number(sos.location.latitude), Number(sos.location.longitude)) &&
             typeof sos.sender === 'string'
-        ).slice(0, 20);
+        ).slice(0, 20).map(sos => sos.delivery === 'pending' ? { ...sos, delivery: 'unconfirmed' } : sos);
 
         renderSOSAlerts();
         updateSOSCount();
