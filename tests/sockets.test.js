@@ -309,6 +309,101 @@ describe('Socket.IO Realtime Event Handlers', () => {
         assert.strictEqual(relayed, false);
     });
 
+    it('joins the public room by default', async () => {
+        const received = withTimeout(new Promise(resolve => clientSocket2.once('chat-message', resolve)));
+        clientSocket1.emit('chat-message', { text: 'public hello' });
+        assert.equal((await received).text, 'public hello');
+    });
+
+    it('sends a snapshot of existing locations to a newly joined device', async () => {
+        clientSocket1.emit('join-room', { room: 'snapshot', deviceName: 'One' });
+        await withTimeout(new Promise(resolve => clientSocket1.once('joined-room', resolve)));
+        const own = withTimeout(new Promise(resolve => clientSocket1.once('receive-location', resolve)));
+        clientSocket1.emit('send-location', { latitude: 10, longitude: 20 });
+        await own;
+        const snapshot = withTimeout(new Promise(resolve => clientSocket2.once('update-device-list', resolve)));
+        clientSocket2.emit('join-room', { room: 'snapshot', deviceName: 'Two' });
+        assert.ok((await snapshot).some(([id]) => id === clientSocket1.id));
+    });
+
+    it('removes old location and audio membership on room change', async () => {
+        const join = (client, room) => {
+            const done = withTimeout(new Promise(resolve => client.once('joined-room', resolve)));
+            client.emit('join-room', { room, deviceName: 'Device' });
+            return done;
+        };
+        await join(clientSocket1, 'old-room');
+        await join(clientSocket2, 'old-room');
+        const location = withTimeout(new Promise(resolve => clientSocket2.once('receive-location', resolve)));
+        clientSocket1.emit('send-location', { latitude: 1, longitude: 2 });
+        await location;
+        const audioReady = withTimeout(new Promise(resolve => clientSocket1.once('audio-peers', resolve)));
+        clientSocket1.emit('join-audio');
+        await audioReady;
+        const gone = withTimeout(new Promise(resolve => clientSocket2.once('user-disconnect', resolve)));
+        const audioGone = withTimeout(new Promise(resolve => clientSocket2.once('user-disconnected', resolve)));
+        const snapshot = withTimeout(new Promise(resolve => clientSocket1.once('update-device-list', resolve)));
+        await join(clientSocket1, 'new-room');
+        assert.equal((await gone).peerId, clientSocket1.id);
+        assert.equal((await audioGone).peerId, clientSocket1.id);
+        assert.equal((await snapshot).length, 0);
+    });
+
+    it('keeps application room names separate from Socket.IO private rooms', async () => {
+        const joined = withTimeout(new Promise(resolve => clientSocket1.once('joined-room', resolve)));
+        clientSocket1.emit('join-room', { room: clientSocket2.id, deviceName: 'Attacker' });
+        await joined;
+        let leaked = false;
+        clientSocket2.on('chat-message', () => { leaked = true; });
+        const ack = await withTimeout(new Promise(resolve => clientSocket1.emit('chat-message', { text: 'not public' }, resolve)));
+        assert.equal(ack.success, true);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.equal(leaked, false);
+    });
+
+    it('uses the joined name rather than a spoofed chat sender', async () => {
+        const joined = withTimeout(new Promise(resolve => clientSocket1.once('joined-room', resolve)));
+        clientSocket1.emit('join-room', { room: 'public', deviceName: 'Alice' });
+        await joined;
+        const msg = withTimeout(new Promise(resolve => clientSocket2.once('chat-message', resolve)));
+        clientSocket1.emit('chat-message', { sender: 'Bob', text: 'Hi' });
+        assert.equal((await msg).sender, 'Alice');
+    });
+
+    it('does not misrepresent invalid SOS coordinates as a location', async () => {
+        const msg = withTimeout(new Promise(resolve => clientSocket2.once('sos-alert', resolve)));
+        clientSocket1.emit('sos-alert', { location: { latitude: 900, longitude: 1 } });
+        assert.equal((await msg).locationAvailable, false);
+    });
+
+    it('rejects cross-origin WebSocket connections even with a session cookie', async () => {
+        const res = await request(app).get('/');
+        const cookie = res.headers['set-cookie'][0].split(';')[0];
+        const client = ioClient(`http://localhost:${port}`, {
+            transports: ['websocket'], forceNew: true, reconnection: false,
+            extraHeaders: { Cookie: cookie, Origin: 'https://attacker.example' }
+        });
+        const error = await withTimeout(new Promise(resolve => client.once('connect_error', resolve)));
+        assert.ok(error);
+        client.close();
+    });
+
+    it('ignores malformed WebRTC signaling and requires audio membership', async () => {
+        const ready = withTimeout(new Promise(resolve => clientSocket2.once('audio-peers', resolve)));
+        clientSocket2.emit('join-audio');
+        await ready;
+        let received = false;
+        clientSocket2.on('offer', () => { received = true; });
+        clientSocket1.emit('offer', null);
+        clientSocket1.emit('answer', null);
+        clientSocket1.emit('ice-candidate', null);
+        clientSocket1.emit('offer', { target: clientSocket2.id, description: { type: 'offer', sdp: 'test' } });
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.equal(received, false);
+        const ack = await withTimeout(new Promise(resolve => clientSocket1.emit('chat-message', {text:'still alive'}, resolve)));
+        assert.equal(ack.success, true);
+    });
+
     it('switching rooms updates the device list of the old room', async () => {
         clientSocket1.emit('join-room', { room: 'room-a', deviceName: 'Mover' });
         clientSocket2.emit('join-room', { room: 'room-a', deviceName: 'Stayer' });

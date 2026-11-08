@@ -30,7 +30,7 @@ export function createPeerConnection(peerId) {
     const pc = new RTCPeerConnection(WEBRTC_CONFIGURATION);
 
     // Initialize pending candidates array
-    pendingCandidates[peerId] = [];
+    pendingCandidates[peerId] ||= [];
 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
@@ -53,7 +53,7 @@ export function createPeerConnection(peerId) {
     // Monitor ICE connection state
     pc.oniceconnectionstatechange = () => {
         console.log(`ICE state for ${peerId}: ${pc.iceConnectionState}`);
-        if (['failed', 'disconnected', 'closed'].includes(pc.iceConnectionState)) {
+        if (['failed', 'closed'].includes(pc.iceConnectionState)) {
             handlePeerDisconnected(peerId);
         } else if (pc.iceConnectionState === 'connected') {
             addNotification(`Audio connected with a peer`);
@@ -346,7 +346,8 @@ async function joinCall() {
 /**
  * Leave the audio call
  */
-function leaveCall() {
+export function leaveCall() {
+    if (!isInCall && !localStream) return;
     // Stop local stream
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -493,14 +494,9 @@ export function handleUserDisconnectedFromAudio(peerId) {
 export function handleAudioPeersList(peers) {
     console.log('Received audio peers list:', peers);
 
-    // Initiate calls to all existing peers
-    if (isInCall && localStream) {
-        peers.forEach(peer => {
-            if (!peerConnections[peer.peerId]) {
-                initiateCall(peer.peerId);
-            }
-        });
-    }
+    // Existing participants initiate offers in response to user-connected.
+    // The newcomer only answers, avoiding simultaneous offers (glare).
+    updateCallUI();
 }
 
 /**

@@ -136,19 +136,24 @@ export function initChat() {
     function sendMessage() {
         const messageText = messageInput.value.trim();
         if (!messageText) return;
-        messageInput.value = '';
-        const currentName = localStorage.getItem('userName') || currentUserName || 'Unknown';
+        if (!socket.connected) {
+            addNotification('Message not sent: disconnected.');
+            return;
+        }
+        sendBtn.disabled = true;
         const messageData = {
             text: messageText,
-            sender: currentName,
+            sender: localStorage.getItem('userName') || currentUserName || 'Unknown',
             timestamp: Date.now()
         };
-        addMessageToChat(messageData, true);
-        socket.emit('chat-message', messageData, (response) => {
-            if (response?.error) {
-                console.error('Error sending message:', response.error);
-                addNotification(`Failed to send message: ${response.error}`);
+        socket.timeout(5000).emit('chat-message', messageData, (error, response) => {
+            sendBtn.disabled = false;
+            if (error || response?.error) {
+                addNotification(`Message not confirmed: ${response?.error || 'connection timed out'}`);
+                return;
             }
+            if (messageInput.value.trim() === messageText) messageInput.value = '';
+            addMessageToChat(messageData, true);
         });
     }
 }

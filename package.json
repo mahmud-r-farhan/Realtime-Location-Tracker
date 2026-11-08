@@ -5,8 +5,9 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "test": "node --test tests/*.test.js"
+    "dev": "node --watch src/app.js",
+    "test": "node --test tests/*.test.js",
+    "check": "sh scripts/check-syntax.sh"
   },
   "keywords": [
     "realtime",
@@ -22,14 +23,13 @@
   "dependencies": {
     "compression": "^1.7.5",
     "ejs": "^3.1.10",
-    "express": "^4.19.2",
+    "express": "^4.22.3",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.2.0",
     "leaflet": "^1.9.4",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9",
     "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0"
   }

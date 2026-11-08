@@ -202,24 +202,24 @@ async function triggerSOS() {
 
         const localEntry = { ...sosData, isOwn: true };
 
-        // Emit SOS to all users in the room. The ack carries our public IP so
-        // our own alert card can show real data instead of a placeholder.
-        socket.emit('sos-alert', sosData, (response) => {
-            if (response && response.success && response.ip) {
-                localEntry.ipInfo = { ip: String(response.ip) };
-                persistAndRender();
-                enrichIpInfo(localEntry);
-            } else if (response && response.error) {
-                localEntry.ipInfo = { ip: 'Unknown' };
-                persistAndRender();
-                addNotification(`⚠️ SOS not delivered: ${response.error}`);
-            }
-        });
-
-        // Add to local notifications
-        addNotification(location.locationAvailable
-            ? '⚠️ SOS sent! All users have been alerted.'
-            : '⚠️ SOS sent (without GPS location). All users have been alerted.');
+        // An acknowledgement confirms only server relay, not receipt or response.
+        // Do not queue an emergency message silently while disconnected.
+        if (!socket.connected) {
+            addNotification('⚠️ SOS not sent: disconnected. Contact emergency services directly.');
+        } else {
+            socket.timeout(5000).emit('sos-alert', sosData, (error, response) => {
+                if (!error && response?.success) {
+                    localEntry.ipInfo = { ip: String(response.ip || 'Unknown') };
+                    persistAndRender();
+                    addNotification('⚠️ SOS relayed to connected room members. Receipt is not guaranteed.');
+                    enrichIpInfo(localEntry);
+                } else {
+                    localEntry.ipInfo = { ip: 'Unknown' };
+                    persistAndRender();
+                    addNotification(`⚠️ SOS delivery not confirmed: ${response?.error || 'connection timed out'}. Contact emergency services directly.`);
+                }
+            });
+        }
 
         // Add to local SOS list
         await addSOSToList(localEntry);

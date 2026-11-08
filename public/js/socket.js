@@ -10,7 +10,8 @@ import {
     closePeerConnection,
     handleUserConnectedToAudio,
     handleUserDisconnectedFromAudio,
-    handleAudioPeersList
+    handleAudioPeersList,
+    leaveCall
 } from './audio.js';
 import { getDeviceName } from './device.js';
 
@@ -48,6 +49,8 @@ export function initSocketEventHandlers(onJoinSuccess) {
 
     socket.on('disconnect', (reason) => {
         addNotification('Disconnected from server');
+        leaveCall();
+        Object.keys(markers).forEach(removeMarker);
         if (reason === 'io server disconnect') {
             // The server forcefully disconnected us; socket.io will NOT
             // auto-reconnect in this case - do it manually.
@@ -94,6 +97,9 @@ export function initSocketEventHandlers(onJoinSuccess) {
 
     socket.on('update-device-list', (devices) => {
         if (!Array.isArray(devices)) return;
+        const ids = new Set(devices.map(([id]) => id));
+        Object.keys(markers).forEach(id => { if (!ids.has(id)) removeMarker(id); });
+        devices.forEach(([id, device]) => updateMarker({ id, ...device }));
         updateDeviceList(devices, socket.id);
     });
 
@@ -139,8 +145,7 @@ export function initSocketEventHandlers(onJoinSuccess) {
     // in socket.js also played a beep here, causing two beeps per message.
     // We only call addMessageToChat — the sound is its responsibility.
     socket.on('chat-message', (data) => {
-        const userName = localStorage.getItem('userName') || getDeviceName();
-        if (data.senderId === socket.id || data.sender === userName) {
+        if (data.senderId === socket.id) {
             return; // Own message (already echoed locally on send)
         }
         addMessageToChat(data, false);
@@ -148,9 +153,14 @@ export function initSocketEventHandlers(onJoinSuccess) {
 }
 
 export function emitJoinRoom(room, deviceName) {
-    lastRoom = room || 'public';
+    const nextRoom = room || 'public';
+    if (lastRoom && lastRoom !== nextRoom) {
+        leaveCall();
+        Object.keys(markers).forEach(removeMarker);
+    }
+    lastRoom = nextRoom;
     lastDeviceName = deviceName || null;
-    socket.emit('join-room', { room: lastRoom, deviceName: lastDeviceName });
+    if (socket.connected) socket.emit('join-room', { room: lastRoom, deviceName: lastDeviceName });
 }
 
 export function emitSendLocation(locationData) {

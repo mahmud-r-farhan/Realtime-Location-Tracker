@@ -35,6 +35,7 @@ const deviceName = getDeviceName();
 let locationSendIntervalId = null;
 let isStationary = false;
 let appInitialized = false;
+let roomReady = false;
 
 // Motion-based battery optimization: slow GPS polling after the device has
 // been motionless for a while (time-based rather than counting events, since
@@ -48,7 +49,10 @@ let lastAcceleration = { x: 0, y: 0, z: 0 };
 window.addEventListener('profileUpdate', (e) => {
     const { userName, orgName } = e.detail;
     setCurrentChatUser(userName || deviceName);
+    if (!appInitialized) return;
     // Re-join so the server moves us to the new organization/fleet room
+    roomReady = false;
+    locationGeneration++;
     emitJoinRoom(orgName, userName || deviceName);
     addNotification('🔄 Profile updated synced');
 });
@@ -96,15 +100,20 @@ function initMotionDetection() {
 }
 
 let lastLocation = null;
+let locationRequestInFlight = false;
+let locationGeneration = 0;
 // GPS readings jitter by several meters even when standing still; exact float
 // comparison never deduplicates. Skip sends when movement is below this.
 const MIN_SEND_DISTANCE_METERS = 8;
 
 async function sendLocationData() {
+    if (locationRequestInFlight || !socket.connected || !roomReady) return;
     if (!('geolocation' in navigator)) {
         addNotification('Geolocation is not available.');
         return;
     }
+    locationRequestInFlight = true;
+    const generation = locationGeneration;
     try {
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
@@ -124,6 +133,8 @@ async function sendLocationData() {
             }
         }
 
+        const info = await getDeviceInfo();
+        if (!socket.connected || !roomReady || generation !== locationGeneration) return;
         lastLocation = { latitude, longitude };
 
         const displayName = getUserName() || deviceName;
@@ -133,7 +144,7 @@ async function sendLocationData() {
             longitude,
             deviceName: displayName,
             accuracy,
-            deviceInfo: await getDeviceInfo() // Cached internally; cheap after first call
+            deviceInfo: info
         });
     } catch (error) {
         console.error('Error getting location:', error);
@@ -147,6 +158,8 @@ async function sendLocationData() {
                 locationSendIntervalId = null;
             }
         }
+    } finally {
+        locationRequestInFlight = false;
     }
 }
 
@@ -205,16 +218,23 @@ function initializeApp() {
     initBatteryMonitor();
     initInviteLink();
 
-    // Join Room
-    emitJoinRoom(getOrgName(), getUserName() || deviceName);
+    socket.on('disconnect', () => {
+        roomReady = false;
+        locationGeneration++;
+        lastLocation = null;
+    });
 
-    // Socket handlers with callback for when joined
+    // Install listeners before joining: a fast acknowledgement must not be lost.
     initSocketEventHandlers(() => {
-        // Start updates after joining room
+        // Republish even if the device has not moved since reconnect or a room change.
+        locationGeneration++;
+        roomReady = true;
+        lastLocation = null;
         startLocationUpdates(LOCATION_SEND_INTERVAL);
         initMotionDetection();
         addNotification('📍 Location sharing enabled');
     });
+    emitJoinRoom(getOrgName(), getUserName() || deviceName);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -222,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const roomParam = urlParams.get('room');
     if (roomParam) {
-        localStorage.setItem('orgName', roomParam);
+        updateProfile(undefined, roomParam);
     }
 
     const uName = getUserName();

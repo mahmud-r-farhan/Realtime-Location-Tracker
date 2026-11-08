@@ -1,9 +1,9 @@
 // Service Worker for Realtime Location Tracker PWA
 // NOTE: bump the cache versions whenever precached assets change, so all
 // clients pick up the new files (old caches are purged on activation).
-const CACHE_NAME        = 'location-tracker-v4';
-const STATIC_CACHE_NAME = 'static-cache-v4';
-const DYNAMIC_CACHE_NAME= 'dynamic-cache-v4';
+const CACHE_NAME        = 'location-tracker-v5-202611';
+const STATIC_CACHE_NAME = 'static-cache-v5-202611';
+const DYNAMIC_CACHE_NAME= 'dynamic-cache-v5-202611';
 
 // Assets to cache immediately on install - includes the full ES-module graph
 // (main.js imports every other module, so all of them are required offline).
@@ -115,7 +115,8 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames
                     .filter((name) => {
-                        return name !== STATIC_CACHE_NAME &&
+                        return /^(location-tracker|static-cache|dynamic-cache)-v/.test(name) &&
+                            name !== STATIC_CACHE_NAME &&
                             name !== DYNAMIC_CACHE_NAME &&
                             name !== CACHE_NAME;
                     })
@@ -156,7 +157,7 @@ self.addEventListener('fetch', (event) => {
                 return fetch(request)
                     .then((response) => {
                         if (response.ok) {
-                            cache.put(request, response.clone());
+                            event.waitUntil(cache.put(request, response.clone()).then(() => trimCache(DYNAMIC_CACHE_NAME, MAX_DYNAMIC_CACHE_ENTRIES)));
                         }
                         return response;
                     })

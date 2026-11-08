@@ -1,3 +1,12 @@
+### Unreleased — v5 stabilization (not a production release)
+
+- Fixed public-room membership, room transition cleanup, location snapshots and reconnect republishing.
+- Hardened WebSocket origins, signaling membership and rate limits; corrected chat and SOS delivery status.
+- Updated production dependencies, added server regression coverage, syntax checks and a Docker CI smoke test.
+- Documented the lack of authentication, delivery guarantees, TURN and real-device acceptance testing. See AUDIT.md.
+
+---
+
 # Changelog
 
 ## Version Release

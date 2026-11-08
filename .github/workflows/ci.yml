@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
 
@@ -26,5 +25,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check JavaScript syntax
+        run: npm run check
+
       - name: Run test suite
         run: npm test
+
+      - name: Audit dependencies
+        run: npm audit
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t location-tracker:test .
+      - name: Start and check health
+        run: |
+          docker run -d --name tracker -p 3007:3007 location-tracker:test
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://localhost:3007/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs tracker
+          exit 1

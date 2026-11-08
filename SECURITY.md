@@ -1,17 +1,9 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Reporting vulnerabilities
 
-We support the following versions:
+Please report suspected vulnerabilities privately to `dev@devplus.fun` rather than opening a public issue. Include affected version, reproduction steps, impact and any mitigation. Do not include real location or personal data in reports. Maintainer response and support timelines are not guaranteed.
 
-| Version | Supported |
-|---------|-----------|
-| 5.x     | ✅         |
-| 4.x     | ✅         |
-| 3.x     | ✅         |
-| 2.x     | ✅         |
-| 1.x     | ❌        |
+## Deployment warning
 
-## Reporting a Vulnerability
-
-If you discover a security vulnerability, please send an email to `dev@devplus.fun`. Do not post it publicly. We will investigate and address the issue promptly.
+The current application has no user authentication or room authorization. Room names are not secrets or access controls; the signed anonymous cookie is not an identity. Do not expose sensitive locations on a public deployment. See [AUDIT.md](AUDIT.md) for known blockers and [README.md](README.md) for HTTPS and proxy configuration. SOS is not a substitute for emergency services. Older release support is not guaranteed; verify security fixes against the branch you deploy.

@@ -63,7 +63,7 @@ function getClientIP(socket) {
     const handshake = socket.handshake;
     if (!handshake) return 'Unknown';
 
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.TRUST_PROXY === '1') {
         const forwardedFor = handshake.headers['x-forwarded-for'];
         if (forwardedFor) {
             const firstHop = String(forwardedFor).split(',')[0].trim();
@@ -100,7 +100,10 @@ const EVENT_RATE_LIMITS = {
     'send-location': { max: 120, windowMs: 60_000 },
     'chat-message': { max: 20, windowMs: 60_000 },
     'sos-alert': { max: 5, windowMs: 60_000 },
-    'request-join-call': { max: 4, windowMs: 60_000 }
+    'request-join-call': { max: 4, windowMs: 60_000 },
+    'offer': { max: 60, windowMs: 60_000 },
+    'answer': { max: 60, windowMs: 60_000 },
+    'ice-candidate': { max: 300, windowMs: 60_000 }
 };
 
 function isRateLimited(socket, event) {
@@ -127,10 +130,14 @@ function isRateLimited(socket, event) {
     return false;
 }
 
+// Socket.IO also uses socket IDs as private room names. Namespace application
+// rooms so an attacker cannot collide with a socket's internal room.
+function roomChannel(room) { return `tracker-room:${room}`; }
+
 function broadcastRoomStats(io, connectedDevices, room) {
     const devicesInRoom = getDevicesInRoom(connectedDevices, room);
-    io.to(room).emit('update-device-list', devicesInRoom);
-    io.to(room).emit('update-user-count', devicesInRoom.length);
+    io.to(roomChannel(room)).emit('update-device-list', devicesInRoom);
+    io.to(roomChannel(room)).emit('update-user-count', devicesInRoom.length);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +178,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
     io.on('connection', (socket) => {
         socket.clientIP = getClientIP(socket);
         socket.room = 'public';
+        socket.join(roomChannel('public'));
 
         socket.on('join-room', (data) => {
             const rawRoom = data && data.room ? data.room : 'public';
@@ -182,19 +190,25 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const previousRoom = socket.room;
 
             if (previousRoom !== roomName) {
-                // Keep the device registry consistent so the old room's list
-                // drops this device immediately instead of waiting for the
-                // next location update.
+                // A location from the old room must never be copied into the
+                // new room. Wait for a fresh update after the move instead.
                 const existing = connectedDevices.get(socket.id);
-                if (existing) existing.room = roomName;
-
-                socket.leave(previousRoom);
-                socket.join(roomName);
-                socket.room = roomName;
-
-                if (previousRoom) {
-                    broadcastRoomStats(io, connectedDevices, previousRoom);
+                connectedDevices.delete(socket.id);
+                if (existing) {
+                    socket.to(roomChannel(previousRoom)).emit('user-disconnect', {
+                        peerId: socket.id, userName: existing.deviceName
+                    });
                 }
+                if (peers.has(socket.id)) {
+                    peers.delete(socket.id);
+                    socket.to(roomChannel(previousRoom)).emit('user-disconnected', {
+                        peerId: socket.id, userName: socket.deviceName || 'Unknown'
+                    });
+                }
+                socket.leave(roomChannel(previousRoom));
+                socket.join(roomChannel(roomName));
+                socket.room = roomName;
+                broadcastRoomStats(io, connectedDevices, previousRoom);
             }
 
             socket.deviceName = deviceName;
@@ -219,11 +233,11 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             }
 
             if (!socket.room) {
-                socket.join('public');
+                socket.join(roomChannel('public'));
                 socket.room = 'public';
             }
 
-            const rawName = data.deviceName || socket.deviceName || 'Unknown';
+            const rawName = socket.deviceName || data.deviceName || 'Unknown';
             const sanitizedDeviceName = sanitizeString(rawName, 50) || 'Unknown';
 
             const deviceData = {
@@ -233,14 +247,15 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 accuracy: Math.max(0, Math.min(acc, 10000)),
                 deviceInfo: sanitizeDeviceInfo(data.deviceInfo),
                 ip: socket.clientIP,
-                joinedAt: new Date(),
+                joinedAt: connectedDevices.get(socket.id)?.joinedAt || new Date(),
+                updatedAt: new Date(),
                 room: socket.room
             };
 
             connectedDevices.set(socket.id, deviceData);
             socket.deviceName = sanitizedDeviceName;
 
-            io.to(socket.room).emit('receive-location', { id: socket.id, ...deviceData });
+            io.to(roomChannel(socket.room)).emit('receive-location', { id: socket.id, ...deviceData });
             broadcastRoomStats(io, connectedDevices, socket.room);
         });
 
@@ -277,7 +292,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 return;
             }
 
-            const rawSender = data.sender || socket.deviceName || 'Unknown';
+            const rawSender = socket.deviceName || 'Unknown';
             const senderName = sanitizeString(rawSender, 50) || 'Unknown';
 
             const messageData = {
@@ -289,7 +304,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 room: room
             };
 
-            io.to(room).emit('chat-message', messageData);
+            io.to(roomChannel(room)).emit('chat-message', messageData);
 
             if (typeof callback === 'function') {
                 callback({ success: true, messageId: messageData.id });
@@ -314,17 +329,17 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             }
 
             const room = socket.room || 'public';
-            const rawSender = data.sender || socket.deviceName || 'Unknown';
+            const rawSender = socket.deviceName || 'Unknown';
             const sanitizedSender = sanitizeString(rawSender, 50) || 'Unknown';
 
             const lat = parseFloat(data.location.latitude);
             const lng = parseFloat(data.location.longitude);
             const acc = parseFloat(data.location.accuracy) || 0;
 
-            // An SOS without usable coordinates is still broadcast, but with
-            // clamped, non-hostile numbers.
-            const safeLat = Number.isFinite(lat) ? Math.max(-90, Math.min(90, lat)) : 0;
-            const safeLng = Number.isFinite(lng) ? Math.max(-180, Math.min(180, lng)) : 0;
+            const validLocation = Number.isFinite(lat) && Number.isFinite(lng) &&
+                lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+            const safeLat = validLocation ? lat : 0;
+            const safeLng = validLocation ? lng : 0;
 
             const sosData = {
                 id: `sos-${Date.now()}-${socket.id}`,
@@ -338,7 +353,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 // False only when the sender explicitly reports no usable GPS
                 // fix; the alert is still relayed so people know there is an
                 // emergency even without coordinates.
-                locationAvailable: data.locationAvailable !== false,
+                locationAvailable: data.locationAvailable !== false && validLocation,
                 deviceInfo: sanitizeDeviceInfo(data.deviceInfo),
                 ipInfo: {
                     ip: socket.clientIP
@@ -348,13 +363,14 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
                 room: room
             };
 
-            socket.to(room).emit('sos-alert', sosData);
+            socket.to(roomChannel(room)).emit('sos-alert', sosData);
             respond({ success: true, ip: socket.clientIP });
         });
 
         // Audio & WebRTC signaling
         socket.on('join-audio', () => {
             const room = socket.room || 'public';
+            if (peers.has(socket.id)) return;
 
             const currentPeers = [];
             for (const [peerId, peerData] of peers) {
@@ -366,7 +382,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             peers.set(socket.id, { socket, deviceName: socket.deviceName || 'Unknown', room: room });
 
             socket.emit('audio-peers', currentPeers);
-            socket.to(room).emit('user-connected', {
+            socket.to(roomChannel(room)).emit('user-connected', {
                 peerId: socket.id,
                 userName: socket.deviceName || 'Unknown'
             });
@@ -378,7 +394,7 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const room = socket.room || 'public';
             peers.delete(socket.id);
 
-            socket.to(room).emit('user-disconnected', {
+            socket.to(roomChannel(room)).emit('user-disconnected', {
                 peerId: socket.id,
                 userName: socket.deviceName || 'Unknown'
             });
@@ -390,13 +406,16 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const room = socket.room || 'public';
             const senderName = socket.deviceName || 'A user';
 
-            socket.to(room).emit('request-join-call', {
+            socket.to(roomChannel(room)).emit('request-join-call', {
                 senderId: socket.id,
                 senderName: senderName
             });
         });
 
-        socket.on('offer', ({ target, description } = {}) => {
+        socket.on('offer', (data) => {
+            if (!data || typeof data !== 'object' || !peers.has(socket.id)) return;
+            const { target, description } = data;
+            if (isRateLimited(socket, 'offer')) return;
             if (typeof target !== 'string' || !isValidSessionDescription(description, 'offer')) return;
             const peer = peers.get(target);
             if (peer && peer.room === socket.room) {
@@ -407,7 +426,10 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             }
         });
 
-        socket.on('answer', ({ target, description } = {}) => {
+        socket.on('answer', (data) => {
+            if (!data || typeof data !== 'object' || !peers.has(socket.id)) return;
+            const { target, description } = data;
+            if (isRateLimited(socket, 'answer')) return;
             if (typeof target !== 'string' || !isValidSessionDescription(description, 'answer')) return;
             const peer = peers.get(target);
             if (peer && peer.room === socket.room) {
@@ -418,7 +440,10 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             }
         });
 
-        socket.on('ice-candidate', ({ target, candidate } = {}) => {
+        socket.on('ice-candidate', (data) => {
+            if (!data || typeof data !== 'object' || !peers.has(socket.id)) return;
+            const { target, candidate } = data;
+            if (isRateLimited(socket, 'ice-candidate')) return;
             if (typeof target !== 'string' || !isValidIceCandidate(candidate)) return;
             const peer = peers.get(target);
             if (peer && peer.room === socket.room) {
@@ -437,14 +462,14 @@ module.exports = function setupSockets(io, connectedDevices, peers) {
             const room = (deviceData && deviceData.room) || socket.room || 'public';
 
             if (deviceData) {
-                io.to(room).emit('user-disconnect', {
+                io.to(roomChannel(room)).emit('user-disconnect', {
                     peerId: socket.id,
                     userName: deviceData.deviceName
                 });
             }
 
             if (wasInAudio) {
-                io.to(room).emit('user-disconnected', {
+                io.to(roomChannel(room)).emit('user-disconnected', {
                     peerId: socket.id,
                     userName: (deviceData && deviceData.deviceName) || 'Unknown'
                 });
